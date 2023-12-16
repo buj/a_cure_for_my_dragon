@@ -14,7 +14,6 @@ export enum Dialect {
 }
 
 export type Inventory = {
-  storageCapacity: number;
   rubies: number;
   alchemy: {
     [key in AlchemicalResource]: number;
@@ -30,7 +29,6 @@ export type Inventory = {
 export namespace Inventory {
   export function createInitial(): Inventory {
     return {
-      storageCapacity: 2,
       rubies: 2,
       alchemy: {
         Mushroom: 0,
@@ -654,29 +652,14 @@ export namespace WorldInit {
     }
   }
 
-  export function mapToCellRow(row: string): Cell[] {
-    const result: Cell[] = [];
-    for (const ch of row) {
-      if (ch in WorldInit) {
-        result.push(mapToCell(ch as WorldInit));
-      } else {
-        result.push({
-          terrain: WorldTerrainType.Void,
-        });
-      }
+  export function tryFromChar(ch: string): WorldInit {
+    if (ch in WorldInit) {
+      return ch as WorldInit;
+    } else {
+      return WorldInit.Void;
     }
-    return result;
   }
 }
-
-type WorldRow = {
-  leftReversed: Cell[];
-  right: Cell[];
-};
-
-export type World = {
-  rows: WorldRow[];
-};
 
 export type Position = { y: number; x: number };
 
@@ -694,74 +677,72 @@ export namespace Position {
   }
 }
 
-export namespace World {
-  export function init(rowsInit: Array<[string, string]>): World {
-    const rows = rowsInit.map(([left, right]) => ({
-      leftReversed: WorldInit.mapToCellRow(left).reverse(),
-      right: WorldInit.mapToCellRow(right),
-    }));
-    return {
-      rows,
-    };
-  }
+type WorldRow<T> = {
+  leftReversed: T[];
+  right: T[];
+};
 
-  function getRow(world: World, rowNumber: number): WorldRow | null {
-    return world.rows[rowNumber] ?? null;
-  }
+export class World<T> {
+  public constructor(public rows: WorldRow<T>[]) {}
 
-  export function getCell(world: World, pos: Position): Cell {
-    const { x, y } = pos;
-    const row = getRow(world, y);
-    if (row === null) {
+  public map<Y>(f: (x: T) => Y): World<Y> {
+    const rowsMapped: WorldRow<Y>[] = this.rows.map((row) => {
+      const { leftReversed, right } = row;
       return {
-        terrain: WorldTerrainType.Void,
+        leftReversed: leftReversed.map(f),
+        right: right.map(f),
       };
+    });
+    return new World(rowsMapped);
+  }
+
+  getRow(rowNumber: number): WorldRow<T> | null {
+    return this.rows[rowNumber] ?? null;
+  }
+
+  public get(pos: Position): T | null {
+    const { x, y } = pos;
+    const row = this.getRow(y);
+    if (row === null) {
+      return null;
     }
     if (x >= 0) {
-      return (
-        row.right[x] ?? {
-          terrain: WorldTerrainType.Void,
-        }
-      );
+      return row.right[x] ?? null;
     } else {
-      return (
-        row.leftReversed[-x - 1] ?? {
-          terrain: WorldTerrainType.Void,
-        }
-      );
+      return row.leftReversed[-x - 1] ?? null;
     }
   }
 
-  export function getAdjacents(
-    world: World,
-    pos: Position
-  ): Array<{ pos: Position; cell: Cell }> {
+  public getAdjacents(pos: Position): Array<{ pos: Position; value: T }> {
     const adjacentPositions = Position.getAdjacents(pos);
     return adjacentPositions.flatMap((adj) => {
-      const adjCell = getCell(world, adj);
-      if (adjCell.terrain === WorldTerrainType.Void) {
+      const adjValue = this.get(adj);
+      if (adjValue === null) {
         return [];
       } else {
-        return [{ pos: adj, cell: adjCell }];
+        return [{ pos: adj, value: adjValue }];
       }
     });
   }
 
-  export function bfs(
-    world: World,
+  public bfs(
     start: Position,
     limit: number,
-    passable: (cell: Cell) => boolean
-  ): Array<{ pos: Position; cell: Cell }> {
+    passable: (value: T) => boolean
+  ): Array<{ pos: Position; value: T }> {
+    const startValue = this.get(start);
+    if (startValue === null) {
+      throw new Error("invalid starting position");
+    }
     const visited: Set<string> = new Set();
-    const queue: Array<{ pos: Position; cell: Cell; distance: number }> = [
-      { pos: start, cell: getCell(world, start), distance: 0 },
+    const queue: Array<{ pos: Position; value: T; distance: number }> = [
+      { pos: start, value: startValue, distance: 0 },
     ];
-    const result: Array<{ pos: Position; cell: Cell }> = [];
+    const result: Array<{ pos: Position; value: T }> = [];
 
     while (queue.length > 0) {
-      const { pos, cell, distance } = queue.pop()!;
-      result.push({ pos, cell });
+      const { pos, value, distance } = queue.pop()!;
+      result.push({ pos, value });
 
       if (distance >= limit) {
         continue;
@@ -772,16 +753,106 @@ export namespace World {
       }
       visited.add(key);
 
-      const adjacents = getAdjacents(world, pos);
+      const adjacents = this.getAdjacents(pos);
       for (const adj of adjacents) {
-        if (passable(adj.cell)) {
+        if (passable(adj.value)) {
           queue.push({
-            ...adj,
+            pos: adj.pos,
+            value: adj.value,
             distance: distance + 1,
           });
         }
       }
     }
     return result;
+  }
+}
+
+export namespace World {
+  export function init(rowsInit: Array<[string, string]>): World<WorldInit> {
+    const rows = rowsInit.map(([left, right]) => ({
+      leftReversed: left.split("").map(WorldInit.tryFromChar).reverse(),
+      right: right.split("").map(WorldInit.tryFromChar),
+    }));
+    return new World(rows);
+  }
+}
+
+export class Character {
+  public inventory: Inventory;
+  public skills: Skill[];
+  public artifacts: Artifact[];
+
+  constructor() {
+    this.inventory = Inventory.createInitial();
+    this.skills = [];
+    this.artifacts = [];
+  }
+
+  public withSkill(skill: Skill): Character {
+    if (skill in this.skills) {
+      return this;
+    }
+    return {
+      ...this,
+      skills: [...this.skills, skill],
+    };
+  }
+
+  public withArtifact(artifact: Artifact): Character {
+    if (artifact in this.artifacts) {
+      return this;
+    }
+    return {
+      ...this,
+      artifacts: [...this.artifacts, artifact],
+    };
+  }
+
+  public storageCapacity(): number {
+    return (
+      2 +
+      (Skill.HeftyPockets in this.skills ? 1 : 0) +
+      (Artifact.LeatherBackpack in this.artifacts ? 1 : 0)
+    );
+  }
+
+  public movementSpeed(): number {
+    return 2 + (Skill.SwiftBoots in this.skills ? 1 : 0);
+  }
+
+  public canTraverse(cell: Cell): boolean {
+    if (cell.object !== undefined) {
+      return cell.object.type === WorldObjectType.PreviouslyVisited;
+    }
+    switch (cell.terrain) {
+      case WorldTerrainType.Forest:
+        return Skill.WoodlandExplorer in this.skills;
+      case WorldTerrainType.Mountain:
+        return Skill.Mountaineering in this.skills;
+      case WorldTerrainType.Plains:
+        return true;
+      case WorldTerrainType.Lake:
+      case WorldTerrainType.Void:
+        return false;
+    }
+  }
+}
+
+export class GameState {
+  public character: Character;
+  public world: World<Cell>;
+  public charPos: Position;
+  public turnNumber: number;
+
+  public constructor(startPos: Position) {
+    const winit = World.init(worldInit);
+    if ((winit.get(startPos) ?? WorldInit.Void) !== WorldInit.Start) {
+      throw new Error("Invalid starting position");
+    }
+    this.character = new Character();
+    this.world = winit.map(WorldInit.mapToCell);
+    this.charPos = startPos;
+    this.turnNumber = 0;
   }
 }
