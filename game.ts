@@ -394,7 +394,7 @@ export namespace RecipeGenerator {
         IngredientsCombination.WaterlilyMushroom,
         IngredientsCombination.MushroomHoney,
       ],
-      ingredientsRemainingCounts: [1, 2, 3, 4, 5, 6],
+      ingredientsRemainingCounts: [1, 2, 2, 3, 3, 4],
     };
   }
 
