@@ -1332,6 +1332,19 @@ function buildProductionBuilding(
   });
 }
 
+function interactWithProductionBuilding(
+  produce: AlchemicalResource,
+  game: BootstrappedGame
+): BootstrappedGame | null {
+  const newCharacterState = game.state.character.gainItems({
+    [produce]: 10,
+  });
+  return game.withState({
+    ...game.state,
+    character: newCharacterState,
+  });
+}
+
 export function takeAction(
   action: GameAction,
   game: BootstrappedGame
@@ -1362,7 +1375,10 @@ export function takeAction(
         case WorldObjectType.Portal:
           return interactWithPortal(action.target, game);
         case WorldObjectType.ProductionBuilding:
-          return null; // TODO
+          return interactWithProductionBuilding(
+            cell.object.data.produces,
+            game
+          );
         case WorldObjectType.Sage:
           return null; // TODO
         case WorldObjectType.Village:
