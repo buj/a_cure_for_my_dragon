@@ -1340,6 +1340,9 @@ export function takeAction(
     case GameActionType.Move:
       return moveAction(action.target, game);
     case GameActionType.Interact: {
+      if (!Position.areAdjacent(action.target, game.state.charPos)) {
+        return null;
+      }
       const cell = game.state.world.get(action.target);
       if (cell === null) {
         return null;
