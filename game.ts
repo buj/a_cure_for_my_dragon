@@ -1016,6 +1016,30 @@ export namespace GameState {
       lostPagesGenerator: LostPagesGenerator.create(),
     };
   }
+
+  export function moveCharacter(
+    target: Position,
+    gameState: GameState
+  ): GameState | null {
+    const targetCell = gameState.world.get(target);
+    if (targetCell === null || targetCell.object !== undefined) {
+      return null;
+    }
+    return {
+      ...gameState,
+      turnNumber: gameState.turnNumber + 1,
+      charPos: target,
+      world: gameState.world.set(target, {
+        terrain: targetCell.terrain,
+        object: {
+          type: WorldObjectType.PreviouslyVisited,
+          data: {
+            turnNumber: gameState.turnNumber + 1,
+          },
+        },
+      }),
+    };
+  }
 }
 
 export class BootstrappedGame {
@@ -1081,20 +1105,11 @@ function moveAction(
   if (targetCell === null) {
     return null;
   }
-  return game.withState({
-    ...game.state,
-    turnNumber: game.state.turnNumber + 1,
-    charPos: target,
-    world: game.state.world.set(target, {
-      terrain: targetCell.terrain,
-      object: {
-        type: WorldObjectType.PreviouslyVisited,
-        data: {
-          turnNumber: game.state.turnNumber + 1,
-        },
-      },
-    }),
-  });
+  const newState = GameState.moveCharacter(target, game.state);
+  if (newState === null) {
+    return null;
+  }
+  return game.withState(newState);
 }
 
 function caveBarrel(prompt: Prompt, rng: IInput): InventoryOpt {
@@ -1125,6 +1140,18 @@ function enterCave(
     return null;
   }
 
+  const possibleExits = World.listCellsCanReachAndCanEndTurnThere(
+    game.state.world,
+    pos,
+    1,
+    game.state.character.canTraverse
+  ).map(({ pos }) => pos);
+  if (possibleExits.length === 0) {
+    return null;
+  }
+
+  // barrel1
+
   const ctx1: Prompt = {
     context: "caveBarrel.1",
     key: JSON.stringify([game.promptNumber, 0]),
@@ -1135,6 +1162,8 @@ function enterCave(
     ...game.state,
     character: game.state.character.gainItems(gain1),
   };
+
+  // choose which way to go inside the cave (treasure or barrel2?)
 
   const candWays = ["barrel"];
   if (game.state.character.artifacts.length < 3) {
@@ -1184,8 +1213,24 @@ function enterCave(
     default:
       throw new Error("unexpected");
   }
-  state2.turnNumber += 4;
-  return game.withState(state2).nextPromptNumber();
+
+  // move out of the cave
+
+  state2.turnNumber += 3;
+  state2.lastVisitedCave = pos;
+  const exitPos = game.player.chooseFromList(
+    {
+      context: "caveExit",
+      key: JSON.stringify([game.promptNumber, 3]),
+    },
+    possibleExits
+  );
+  const state3 = GameState.moveCharacter(exitPos, state2);
+  if (state3 === null) {
+    return null;
+  }
+
+  return game.withState(state3).nextPromptNumber();
 }
 
 export function takeAction(
