@@ -854,6 +854,40 @@ export namespace World {
     }));
     return new World(rows);
   }
+
+  export function listCellsCanReachAndCanEndTurnThere(
+    world: World<Cell>,
+    start: Position,
+    limit: number,
+    passable: (cell: Cell) => boolean
+  ): Array<{ pos: Position; cell: Cell }> {
+    const cands = world.bfs(start, limit, passable);
+    return cands
+      .map((c) => ({ pos: c.pos, cell: c.value }))
+      .filter((c) => c.cell.object === undefined);
+  }
+
+  export function canReachAndEndTurnThere(
+    world: World<Cell>,
+    start: Position,
+    end: Position,
+    limit: number,
+    passable: (cell: Cell) => boolean
+  ): Cell | null {
+    const reachables = listCellsCanReachAndCanEndTurnThere(
+      world,
+      start,
+      limit,
+      passable
+    );
+    const matches = reachables.filter(
+      ({ pos }) => pos.x === end.x && pos.y === end.y
+    );
+    if (matches.length === 0) {
+      return null;
+    }
+    return matches[0].cell;
+  }
 }
 
 export type CharacterState = {
@@ -1037,20 +1071,14 @@ function moveAction(
   game: BootstrappedGame
 ): BootstrappedGame | null {
   const movementSpeed = game.state.character.movementSpeed();
-  const reachables = game.state.world.bfs(
+  const targetCell = World.canReachAndEndTurnThere(
+    game.state.world,
     game.state.charPos,
+    target,
     movementSpeed,
     game.state.character.canTraverse
   );
-  const reachablePositions = reachables.map((x) => x.pos);
-  const isReachable =
-    reachablePositions.filter((pos) => pos.x === target.x && pos.y === target.y)
-      .length > 0;
-  if (!isReachable) {
-    return null;
-  }
-  const cell = game.state.world.get(target)!;
-  if (cell.object !== undefined) {
+  if (targetCell === null) {
     return null;
   }
   return game.withState({
@@ -1058,11 +1086,11 @@ function moveAction(
     turnNumber: game.state.turnNumber + 1,
     charPos: target,
     world: game.state.world.set(target, {
-      terrain: cell.terrain,
+      terrain: targetCell.terrain,
       object: {
         type: WorldObjectType.PreviouslyVisited,
         data: {
-          turnNumber: game.state.turnNumber,
+          turnNumber: game.state.turnNumber + 1,
         },
       },
     }),
@@ -1120,6 +1148,7 @@ function enterCave(
     candWays
   );
 
+  var state2: GameState;
   switch (whichWay) {
     case "barrel": {
       const ctx2: Prompt = {
@@ -1128,11 +1157,11 @@ function enterCave(
       };
       const gain2 = caveBarrel(ctx2, game.rng());
       game.player.show(ctx2, gain2);
-      const state2 = {
+      state2 = {
         ...state1,
         character: state1.character.gainItems(gain2),
       };
-      return game.withState(state2).nextPromptNumber();
+      break;
     }
     case "treasure": {
       const ctx2: Prompt = {
@@ -1146,15 +1175,17 @@ function enterCave(
       ].filter((a) => !game.state.character.artifacts.includes(a));
       const gainedArtifact = game.rng().chooseFromList(ctx2, cands);
       game.player.show(ctx2, gainedArtifact);
-      const state2 = {
+      state2 = {
         ...state1,
         character: state1.character.withArtifact(gainedArtifact),
       };
-      return game.withState(state2).nextPromptNumber();
+      break;
     }
     default:
       throw new Error("unexpected");
   }
+  state2.turnNumber += 4;
+  return game.withState(state2).nextPromptNumber();
 }
 
 export function takeAction(
