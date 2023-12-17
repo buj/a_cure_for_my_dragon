@@ -56,6 +56,11 @@ export class ControlledInput {
   source: IInput;
   controller: IInput;
 
+  public constructor(source: IInput, controller: IInput) {
+    this.source = source;
+    this.controller = controller;
+  }
+
   public chooseFromRange(prompt: Prompt, l: number, r: number): number {
     const srcChoice = this.source.chooseFromRange(
       {

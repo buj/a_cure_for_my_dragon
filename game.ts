@@ -1,4 +1,4 @@
-import { IInput, IPlayer, Prng, Prompt } from "./entities";
+import { ControlledInput, IInput, IPlayer, Prng, Prompt } from "./entities";
 
 export enum AlchemicalResource {
   Mushroom = "Mushroom",
@@ -986,20 +986,28 @@ export namespace GameState {
 
 export class BootstrappedGame {
   state: GameState;
-  rng: Prng;
+  sourceRng: Prng;
   player: IPlayer;
   promptNumber: number;
 
   public constructor(init: {
     state: GameState;
-    rng: Prng;
+    sourceRng: Prng;
     player: IPlayer;
     promptNumber: number;
   }) {
     this.state = init.state;
     this.promptNumber = init.promptNumber;
-    this.rng = init.rng;
+    this.sourceRng = init.sourceRng;
     this.player = init.player;
+  }
+
+  public rng(): IInput {
+    if (this.state.character.artifacts.includes(Artifact.GoldenDie)) {
+      return new ControlledInput(this.sourceRng, this.player);
+    } else {
+      return this.sourceRng;
+    }
   }
 
   public withState(newState: GameState): BootstrappedGame {
@@ -1093,7 +1101,7 @@ function enterCave(
     context: "caveBarrel.1",
     key: JSON.stringify([game.promptNumber, 0]),
   };
-  const gain1 = caveBarrel(ctx1, game.rng);
+  const gain1 = caveBarrel(ctx1, game.rng());
   game.player.show(ctx1, gain1);
   const state1 = {
     ...game.state,
@@ -1118,7 +1126,7 @@ function enterCave(
         context: "caveBarrel.2",
         key: JSON.stringify([game.promptNumber, 2]),
       };
-      const gain2 = caveBarrel(ctx2, game.rng);
+      const gain2 = caveBarrel(ctx2, game.rng());
       game.player.show(ctx2, gain2);
       const state2 = {
         ...state1,
@@ -1136,7 +1144,7 @@ function enterCave(
         Artifact.LeatherBackpack,
         Artifact.PortalStone,
       ].filter((a) => !game.state.character.artifacts.includes(a));
-      const gainedArtifact = game.rng.chooseFromList(ctx2, cands);
+      const gainedArtifact = game.rng().chooseFromList(ctx2, cands);
       game.player.show(ctx2, gainedArtifact);
       const state2 = {
         ...state1,
