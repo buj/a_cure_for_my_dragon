@@ -727,6 +727,14 @@ export namespace Position {
       { y: y, x: x - 1 },
     ];
   }
+
+  export function areAdjacent(pos1: Position, pos2: Position): boolean {
+    return (
+      Position.getAdjacents(pos1).filter(
+        (pos) => pos.x === pos2.x && pos.y === pos2.y
+      ).length > 0
+    );
+  }
 }
 
 type WorldRow<T> = {
@@ -756,6 +764,19 @@ export namespace WorldRow {
 
 export class World<T> {
   public constructor(public rows: WorldRow<T>[]) {}
+
+  public listHexes(): Array<{ pos: Position; value: T }> {
+    const result: Array<{ pos: Position; value: T }> = [];
+    for (const [y, row] of this.rows.entries()) {
+      for (const [x, value] of row.right.entries()) {
+        result.push({ pos: { x, y }, value });
+      }
+      for (const [negx1, value] of row.leftReversed.entries()) {
+        result.push({ pos: { x: -negx1 - 1, y }, value });
+      }
+    }
+    return result;
+  }
 
   public map<Y>(f: (x: T) => Y): World<Y> {
     const rowsMapped: WorldRow<Y>[] = this.rows.map((row) => {
@@ -1233,6 +1254,46 @@ function enterCave(
   return game.withState(state3).nextPromptNumber();
 }
 
+function interactWithPortal(
+  portalPos: Position,
+  game: BootstrappedGame
+): BootstrappedGame | null {
+  if (!game.state.character.artifacts.includes(Artifact.PortalStone)) {
+    return null;
+  }
+  if (!Position.areAdjacent(portalPos, game.state.charPos)) {
+    return null;
+  }
+  const otherPortalsHexes = game.state.world
+    .listHexes()
+    .filter(
+      ({ value }) =>
+        value.object !== undefined &&
+        value.object.type == WorldObjectType.Portal
+    )
+    .filter(({ pos }) => pos.x !== portalPos.x || pos.y !== portalPos.y);
+  const candExits = otherPortalsHexes.flatMap(({ pos: otherPortalPos }) =>
+    World.listCellsCanReachAndCanEndTurnThere(
+      game.state.world,
+      otherPortalPos,
+      1,
+      game.state.character.canTraverse
+    ).map(({ pos }) => pos)
+  );
+  const dest = game.player.chooseFromList(
+    {
+      context: "portalDestination",
+      key: JSON.stringify(game.promptNumber),
+    },
+    candExits
+  );
+  const newState = GameState.moveCharacter(dest, game.state);
+  if (newState === null) {
+    return null;
+  }
+  return game.withState(newState);
+}
+
 export function takeAction(
   action: GameAction,
   game: BootstrappedGame
@@ -1255,7 +1316,7 @@ export function takeAction(
         case WorldObjectType.Merchant:
           return null; // TODO
         case WorldObjectType.Portal:
-          return null; // TODO
+          return interactWithPortal(action.target, game);
         case WorldObjectType.ProductionBuilding:
           return null; // TODO
         case WorldObjectType.Sage:
