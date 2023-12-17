@@ -109,18 +109,11 @@ export namespace LostPagesGenerator {
   }
 
   export function generate(
-    promptKey: string,
+    prompt: Prompt,
     rng: IInput,
     generator: LostPagesGenerator
   ): { lostPage: LostPage; generator: LostPagesGenerator } {
-    const shift = rng.chooseFromRange(
-      {
-        context: "LostPagesGenerator.generate.shift",
-        key: promptKey,
-      },
-      0,
-      5
-    );
+    const shift = rng.chooseFromRange(prompt, 0, 5);
     const idx = (generator.pos + shift) % generator.wheel.length;
     return {
       lostPage: generator.wheel[idx],
@@ -151,7 +144,7 @@ export namespace Village {
   }
 
   export function revealFirstPage(
-    promptKey: string,
+    prompt: Prompt,
     rng: IInput,
     input: { village: Village; lostPagesGenerator: LostPagesGenerator }
   ): { village: Village; lostPagesGenerator: LostPagesGenerator } | null {
@@ -160,7 +153,7 @@ export namespace Village {
       return null;
     }
     const { lostPage, generator: newLostPagesGenerator } =
-      LostPagesGenerator.generate(promptKey, rng, lostPagesGenerator);
+      LostPagesGenerator.generate(prompt, rng, lostPagesGenerator);
     return {
       village: {
         pages: [
@@ -176,7 +169,7 @@ export namespace Village {
   }
 
   export function purchasePage(
-    promptKey: string,
+    prompt: Prompt,
     rng: IInput,
     input: {
       inventory: Inventory;
@@ -209,7 +202,7 @@ export namespace Village {
     var newLostPagesGenerator = lostPagesGenerator;
     if (village.pages.length < 2) {
       const { lostPage, generator } = LostPagesGenerator.generate(
-        promptKey,
+        prompt,
         rng,
         lostPagesGenerator
       );
@@ -934,6 +927,13 @@ export class Character {
     }
   }
 
+  public withInventory(inventory: Inventory): Character {
+    return {
+      ...this,
+      inventory,
+    };
+  }
+
   public withSkill(skill: Skill): Character {
     if (this.skills.includes(skill)) {
       return this;
@@ -1345,6 +1345,80 @@ function interactWithProductionBuilding(
   });
 }
 
+function interactWithVillage(
+  pos: Position,
+  cell: Cell,
+  game: BootstrappedGame
+): BootstrappedGame | null {
+  if (
+    cell.object === undefined ||
+    cell.object.type !== WorldObjectType.Village
+  ) {
+    return null;
+  }
+  const village = cell.object.data;
+  if (village.pages.length === 0) {
+    const afterReveal = Village.revealFirstPage(
+      {
+        context: "interactWithVillage.revealFirstPage",
+        key: JSON.stringify(game.promptNumber),
+      },
+      game.rng(),
+      {
+        village,
+        lostPagesGenerator: game.state.lostPagesGenerator,
+      }
+    );
+    if (afterReveal === null) {
+      return null;
+    }
+    const newState: GameState = {
+      ...game.state,
+      lostPagesGenerator: afterReveal.lostPagesGenerator,
+      world: game.state.world.set(pos, {
+        terrain: cell.terrain,
+        object: {
+          type: WorldObjectType.Village,
+          data: afterReveal.village,
+        },
+      }),
+    };
+    return game.withState(newState);
+  } else {
+    const afterPurchase = Village.purchasePage(
+      {
+        context: "interactWithVillage.purchasePage",
+        key: JSON.stringify(game.promptNumber),
+      },
+      game.rng(),
+      {
+        inventory: game.state.character.inventory,
+        village,
+        lostPagesGenerator: game.state.lostPagesGenerator,
+      }
+    );
+    if (afterPurchase === null) {
+      return null;
+    }
+    const newState: GameState = {
+      ...game.state,
+      character: game.state.character.withInventory(afterPurchase.inventory),
+      lostPagesGenerator: afterPurchase.lostPagesGenerator,
+      world: game.state.world.set(pos, {
+        terrain: cell.terrain,
+        object: {
+          type: WorldObjectType.Village,
+          data: afterPurchase.village,
+        },
+      }),
+    };
+    if (newState === null) {
+      return null;
+    }
+    return game.withState(newState);
+  }
+}
+
 export function takeAction(
   action: GameAction,
   game: BootstrappedGame
@@ -1382,7 +1456,7 @@ export function takeAction(
         case WorldObjectType.Sage:
           return null; // TODO
         case WorldObjectType.Village:
-          return null; // TODO
+          return interactWithVillage(action.target, cell, game);
         default:
           return null;
       }
