@@ -18,11 +18,11 @@ export type Inventory = {
   alchemy: {
     [key in AlchemicalResource]: number;
   };
-  pages: {
-    [key in Dialect]: {
-      raw: number;
-      translated: number;
-    };
+  rawPages: {
+    [key in Dialect]: number;
+  };
+  translatedPages: {
+    [key in Dialect]: number;
   };
 };
 
@@ -31,11 +31,11 @@ export type InventoryOpt = {
   alchemy?: {
     [key in AlchemicalResource]?: number;
   };
-  pages?: {
-    [key in Dialect]?: {
-      raw?: number;
-      translated?: number;
-    };
+  rawPages?: {
+    [key in Dialect]?: number;
+  };
+  translatedPages?: {
+    [key in Dialect]?: number;
   };
 };
 
@@ -48,13 +48,108 @@ export namespace Inventory {
         Honey: 0,
         Waterlily: 0,
       },
-      pages: {
-        Bird: { raw: 0, translated: 0 },
-        Dragonfly: { raw: 0, translated: 0 },
-        Fish: { raw: 0, translated: 0 },
-        Mouse: { raw: 0, translated: 0 },
+      rawPages: {
+        Bird: 0,
+        Dragonfly: 0,
+        Fish: 0,
+        Mouse: 0,
+      },
+      translatedPages: {
+        Bird: 0,
+        Dragonfly: 0,
+        Fish: 0,
+        Mouse: 0,
       },
     };
+  }
+
+  export function createEmpty(): Inventory {
+    return {
+      rubies: 0,
+      alchemy: {
+        Mushroom: 0,
+        Honey: 0,
+        Waterlily: 0,
+      },
+      rawPages: {
+        Bird: 0,
+        Dragonfly: 0,
+        Fish: 0,
+        Mouse: 0,
+      },
+      translatedPages: {
+        Bird: 0,
+        Dragonfly: 0,
+        Fish: 0,
+        Mouse: 0,
+      },
+    };
+  }
+
+  export function clone(a: Inventory): Inventory {
+    return {
+      rubies: a.rubies,
+      alchemy: { ...a.alchemy },
+      rawPages: { ...a.rawPages },
+      translatedPages: { ...a.translatedPages },
+    };
+  }
+
+  export function limit(a: Inventory, cap: number): Inventory {
+    const result: Inventory = clone(a);
+    result.rubies = Math.min(result.rubies, cap);
+    for (const key in result.alchemy) {
+      result.alchemy[key] = Math.min(result.alchemy[key], cap);
+    }
+    for (const key in result.rawPages) {
+      result.rawPages[key] = Math.min(result.rawPages[key], 4);
+    }
+    for (const key in result.translatedPages) {
+      result.translatedPages[key] = Math.min(result.translatedPages[key], 4);
+    }
+    return result;
+  }
+
+  export function add(a: Inventory, b: InventoryOpt): Inventory {
+    const result: Inventory = clone(a);
+    result.rubies += b.rubies ?? 0;
+    for (const key in b.alchemy ?? {}) {
+      result.alchemy[key] += b.alchemy![key];
+    }
+    for (const key in b.rawPages ?? {}) {
+      result.rawPages[key] += b.rawPages![key];
+    }
+    for (const key in b.translatedPages ?? {}) {
+      result.translatedPages[key] += b.translatedPages![key];
+    }
+    return result;
+  }
+
+  export function subtract(
+    subtrahend: Inventory,
+    minuend: InventoryOpt
+  ): Inventory | null {
+    const result: Inventory = clone(subtrahend);
+    result.rubies -= minuend.rubies ?? 0;
+    for (const key in minuend.alchemy ?? {}) {
+      result.alchemy[key] -= minuend.alchemy![key];
+      if (result.alchemy[key] < 0) {
+        return null;
+      }
+    }
+    for (const key in minuend.rawPages ?? {}) {
+      result.rawPages[key] -= minuend.rawPages![key];
+      if (result.rawPages[key] < 0) {
+        return null;
+      }
+    }
+    for (const key in minuend.translatedPages ?? {}) {
+      result.translatedPages[key] -= minuend.translatedPages![key];
+      if (result.translatedPages[key] < 0) {
+        return null;
+      }
+    }
+    return result;
   }
 }
 
@@ -340,21 +435,14 @@ export namespace Recipe {
     const contribution = Math.min(
       contributionRaw,
       recipe.numPages - recipe.numPagesCollected,
-      inventory.pages[recipe.dialect].translated
+      inventory.translatedPages[recipe.dialect]
     );
     if (contribution <= 0) {
       return null;
     }
-    const newInventory: Inventory = {
-      ...inventory,
-      pages: {
-        ...inventory.pages,
-        [recipe.dialect]: {
-          ...inventory.pages[recipe.dialect],
-          translated: inventory.pages[recipe.dialect].translated - contribution,
-        },
-      },
-    };
+    const newInventory = Inventory.add(inventory, {
+      translatedPages: { [recipe.dialect]: -contribution },
+    });
     var newRecipe: Recipe = recipe;
     var newRecipeGenerator: RecipeGenerator = recipeGenerator;
     if (recipe.numPagesCollected + contribution == recipe.numPages) {
@@ -984,32 +1072,28 @@ export class Character {
   }
 
   public gainItems(items: InventoryOpt): Character {
-    const newRubies = Math.min(
-      this.inventory.rubies + (items.rubies ?? 0),
+    const newInventory = Inventory.limit(
+      Inventory.add(this.inventory, items),
       this.storageCapacity()
     );
-    const newAlchemy = { ...this.inventory.alchemy };
-    if (items.alchemy !== undefined) {
-      for (const key in items.alchemy) {
-        newAlchemy[key] = Math.min(
-          newAlchemy[key] + items.alchemy[key],
-          this.storageCapacity()
-        );
-      }
-    }
-    const newPages = { ...this.inventory.pages };
-    if (items.pages !== undefined) {
-      for (const key in items.pages) {
-        newPages[key] = Math.min(newPages[key] + items.pages[key], 4);
-      }
-    }
     return {
       ...this,
-      inventory: {
-        rubies: newRubies,
-        alchemy: newAlchemy,
-        pages: newPages,
-      },
+      inventory: newInventory,
+    };
+  }
+
+  public tradeItems(cost: InventoryOpt, gain: InventoryOpt): Character | null {
+    const afterCost = Inventory.subtract(this.inventory, cost);
+    if (afterCost === null) {
+      return null;
+    }
+    const newInventory = Inventory.limit(
+      Inventory.add(afterCost, gain),
+      this.storageCapacity()
+    );
+    return {
+      ...this,
+      inventory: newInventory,
     };
   }
 }
@@ -1419,6 +1503,76 @@ function interactWithVillage(
   }
 }
 
+export enum MarketTradeType {
+  GoodForGood,
+  RubyForGoods,
+  GoodsForRuby,
+}
+
+function interactWithMarket(game: BootstrappedGame): BootstrappedGame | null {
+  const tradeType = game.player.chooseFromList(
+    {
+      context: "interactWithMarket.tradeType",
+      key: JSON.stringify([game.promptNumber, 0]),
+    },
+    [
+      MarketTradeType.GoodForGood,
+      MarketTradeType.RubyForGoods,
+      MarketTradeType.GoodsForRuby,
+    ]
+  );
+  const prompt2: Prompt = {
+    context: "interactWithMarket.trade",
+    key: JSON.stringify([game.promptNumber, 1]),
+  };
+
+  var lhs: InventoryOpt;
+  var rhs: InventoryOpt;
+  switch (tradeType) {
+    case MarketTradeType.GoodForGood: {
+      [lhs, rhs] = game.player.chooseFromList(prompt2, [
+        [{ alchemy: { Mushroom: 1 } }, { alchemy: { Honey: 1 } }],
+        [{ alchemy: { Mushroom: 1 } }, { alchemy: { Waterlily: 1 } }],
+        [{ alchemy: { Honey: 1 } }, { alchemy: { Mushroom: 1 } }],
+        [{ alchemy: { Honey: 1 } }, { alchemy: { Waterlily: 1 } }],
+        [{ alchemy: { Waterlily: 1 } }, { alchemy: { Honey: 1 } }],
+        [{ alchemy: { Waterlily: 1 } }, { alchemy: { Mushroom: 1 } }],
+      ]);
+      break;
+    }
+    case MarketTradeType.RubyForGoods: {
+      [lhs, rhs] = game.player.chooseFromList(prompt2, [
+        [{ rubies: 1 }, { alchemy: { Honey: 2 } }],
+        [{ rubies: 1 }, { alchemy: { Mushroom: 2 } }],
+        [{ rubies: 1 }, { alchemy: { Waterlily: 2 } }],
+        [{ rubies: 1 }, { alchemy: { Honey: 1, Mushroom: 1 } }],
+        [{ rubies: 1 }, { alchemy: { Honey: 1, Waterlily: 1 } }],
+        [{ rubies: 1 }, { alchemy: { Mushroom: 1, Waterlily: 1 } }],
+      ]);
+      break;
+    }
+    case MarketTradeType.GoodsForRuby: {
+      [lhs, rhs] = game.player.chooseFromList(prompt2, [
+        [{ alchemy: { Honey: 2 } }, { rubies: 1 }],
+        [{ alchemy: { Mushroom: 2 } }, { rubies: 1 }],
+        [{ alchemy: { Waterlily: 2 } }, { rubies: 1 }],
+        [{ alchemy: { Honey: 1, Mushroom: 1 } }, { rubies: 1 }],
+        [{ alchemy: { Honey: 1, Waterlily: 1 } }, { rubies: 1 }],
+        [{ alchemy: { Mushroom: 1, Waterlily: 1 } }, { rubies: 1 }],
+      ]);
+      break;
+    }
+  }
+  const newCharacterState = game.state.character.tradeItems(lhs, rhs);
+  if (newCharacterState === null) {
+    return null;
+  }
+  return game.withState({
+    ...game.state,
+    character: newCharacterState,
+  });
+}
+
 export function takeAction(
   action: GameAction,
   game: BootstrappedGame
@@ -1441,7 +1595,7 @@ export function takeAction(
         case WorldObjectType.Cave:
           return enterCave(action.target, game);
         case WorldObjectType.Market:
-          return null; // TODO
+          return interactWithMarket(game);
         case WorldObjectType.Marlon:
           return null; // TODO
         case WorldObjectType.Merchant:
