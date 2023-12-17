@@ -1294,6 +1294,44 @@ function interactWithPortal(
   return game.withState(newState);
 }
 
+function buildProductionBuilding(
+  pos: Position,
+  cell: Cell,
+  game: BootstrappedGame
+): BootstrappedGame | null {
+  var produce: AlchemicalResource;
+  switch (cell.terrain) {
+    case WorldTerrainType.Mountain: {
+      produce = AlchemicalResource.Honey;
+      break;
+    }
+    case WorldTerrainType.Lake: {
+      produce = AlchemicalResource.Waterlily;
+      break;
+    }
+    case WorldTerrainType.Forest: {
+      produce = AlchemicalResource.Mushroom;
+      break;
+    }
+    default: {
+      return null;
+    }
+  }
+  const newWorld = game.state.world.set(pos, {
+    ...cell,
+    object: {
+      type: WorldObjectType.ProductionBuilding,
+      data: {
+        produces: produce,
+      },
+    },
+  });
+  return game.withState({
+    ...game.state,
+    world: newWorld,
+  });
+}
+
 export function takeAction(
   action: GameAction,
   game: BootstrappedGame
@@ -1303,8 +1341,11 @@ export function takeAction(
       return moveAction(action.target, game);
     case GameActionType.Interact: {
       const cell = game.state.world.get(action.target);
-      if (cell === null || cell.object === undefined) {
+      if (cell === null) {
         return null;
+      }
+      if (cell.object === undefined) {
+        return buildProductionBuilding(action.target, cell, game);
       }
       switch (cell.object.type) {
         case WorldObjectType.Cave:
