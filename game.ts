@@ -1,4 +1,4 @@
-import { Prng } from "./prng";
+import { IInput, IPlayer, Prng, Prompt } from "./entities";
 
 export enum AlchemicalResource {
   Mushroom = "Mushroom",
@@ -22,6 +22,19 @@ export type Inventory = {
     [key in Dialect]: {
       raw: number;
       translated: number;
+    };
+  };
+};
+
+export type InventoryOpt = {
+  rubies?: number;
+  alchemy?: {
+    [key in AlchemicalResource]?: number;
+  };
+  pages?: {
+    [key in Dialect]?: {
+      raw?: number;
+      translated?: number;
     };
   };
 };
@@ -96,10 +109,18 @@ export namespace LostPagesGenerator {
   }
 
   export function generate(
-    prng: Prng,
+    promptKey: string,
+    rng: IInput,
     generator: LostPagesGenerator
   ): { lostPage: LostPage; generator: LostPagesGenerator } {
-    const shift = prng.randint(0, 5);
+    const shift = rng.chooseFromRange(
+      {
+        context: "LostPagesGenerator.generate.shift",
+        key: promptKey,
+      },
+      0,
+      5
+    );
     const idx = (generator.pos + shift) % generator.wheel.length;
     return {
       lostPage: generator.wheel[idx],
@@ -130,7 +151,8 @@ export namespace Village {
   }
 
   export function revealFirstPage(
-    prng: Prng,
+    promptKey: string,
+    rng: IInput,
     input: { village: Village; lostPagesGenerator: LostPagesGenerator }
   ): { village: Village; lostPagesGenerator: LostPagesGenerator } | null {
     const { village, lostPagesGenerator } = input;
@@ -138,7 +160,7 @@ export namespace Village {
       return null;
     }
     const { lostPage, generator: newLostPagesGenerator } =
-      LostPagesGenerator.generate(prng, lostPagesGenerator);
+      LostPagesGenerator.generate(promptKey, rng, lostPagesGenerator);
     return {
       village: {
         pages: [
@@ -154,7 +176,8 @@ export namespace Village {
   }
 
   export function purchasePage(
-    prng: Prng,
+    promptKey: string,
+    rng: IInput,
     input: {
       inventory: Inventory;
       village: Village;
@@ -186,7 +209,8 @@ export namespace Village {
     var newLostPagesGenerator = lostPagesGenerator;
     if (village.pages.length < 2) {
       const { lostPage, generator } = LostPagesGenerator.generate(
-        prng,
+        promptKey,
+        rng,
         lostPagesGenerator
       );
       newVillage.pages.push({
@@ -298,7 +322,8 @@ export namespace Recipe {
   }
 
   export function contributePages(
-    prng: Prng,
+    promptKey: string,
+    rng: IInput,
     input: {
       recipe: Recipe;
       inventory: Inventory;
@@ -341,7 +366,7 @@ export namespace Recipe {
     var newRecipeGenerator: RecipeGenerator = recipeGenerator;
     if (recipe.numPagesCollected + contribution == recipe.numPages) {
       const { recipeGenerator: recipeGenerator2, recipe: recipe2 } =
-        RecipeGenerator.generate(prng, { recipeGenerator, recipe })!;
+        RecipeGenerator.generate(promptKey, rng, { recipeGenerator, recipe })!;
       newRecipe = recipe2;
       newRecipeGenerator = recipeGenerator2;
     }
@@ -397,7 +422,8 @@ export namespace RecipeGenerator {
   }
 
   export function generate(
-    prng: Prng,
+    promptKey: string,
+    rng: IInput,
     input: {
       recipeGenerator: RecipeGenerator;
       recipe: Recipe;
@@ -408,9 +434,15 @@ export namespace RecipeGenerator {
   } | null {
     const { recipeGenerator, recipe } = input;
     if (recipe.dialect === null) {
-      const { chosen: dialect, rest: remainingDialects } = prng.choice2(
-        recipeGenerator.remainingDialects
-      );
+      const { chosen: dialect, rest: remainingDialects } =
+        IInput.chooseFromListWithoutReplacement(
+          rng,
+          {
+            context: "RecipeGenerator.generate.dialect",
+            key: promptKey,
+          },
+          recipeGenerator.remainingDialects
+        );
       return {
         recipeGenerator: {
           ...recipeGenerator,
@@ -427,14 +459,34 @@ export namespace RecipeGenerator {
       recipe.numPagesCollected >= recipe.numPages
     ) {
       const { chosen: ingredientsCombo, rest: remainingIngredientsCombos } =
-        prng.choice2(recipeGenerator.ingredientsRemainingCombinations);
+        IInput.chooseFromListWithoutReplacement(
+          rng,
+          {
+            context: "RecipeGenerator.generate.ingredients",
+            key: JSON.stringify([promptKey, 0]),
+          },
+          recipeGenerator.ingredientsRemainingCombinations
+        );
       const [ingredient1, ingredient2] =
         ingredientsCombinationToList(ingredientsCombo);
-      const { chosen: count1, rest: ingredientsRemainingCounts } = prng.choice2(
-        recipeGenerator.ingredientsRemainingCounts
-      );
+      const { chosen: count1, rest: ingredientsRemainingCounts } =
+        IInput.chooseFromListWithoutReplacement(
+          rng,
+          {
+            context: "RecipeGenerator.generate.ingredients",
+            key: JSON.stringify([promptKey, 1]),
+          },
+          recipeGenerator.ingredientsRemainingCounts
+        );
       const { chosen: count2, rest: ingredientsRemainingCounts2 } =
-        prng.choice2(ingredientsRemainingCounts);
+        IInput.chooseFromListWithoutReplacement(
+          rng,
+          {
+            context: "RecipeGenerator.generate.ingredients",
+            key: JSON.stringify([promptKey, 2]),
+          },
+          ingredientsRemainingCounts
+        );
       return {
         recipeGenerator: {
           ...recipeGenerator,
@@ -682,6 +734,26 @@ type WorldRow<T> = {
   right: T[];
 };
 
+export namespace WorldRow {
+  export function set<T>(row: WorldRow<T>, x: number, value: T): WorldRow<T> {
+    if (x >= 0) {
+      const newRight = [...row.right];
+      newRight[x] = value;
+      return {
+        leftReversed: row.leftReversed,
+        right: newRight,
+      };
+    } else {
+      const newLeftReversed = [...row.leftReversed];
+      newLeftReversed[-x - 1] = value;
+      return {
+        leftReversed: newLeftReversed,
+        right: row.right,
+      };
+    }
+  }
+}
+
 export class World<T> {
   public constructor(public rows: WorldRow<T>[]) {}
 
@@ -694,6 +766,12 @@ export class World<T> {
       };
     });
     return new World(rowsMapped);
+  }
+
+  public set(pos: Position, value: T): World<T> {
+    const newRows = [...this.rows];
+    newRows[pos.y] = WorldRow.set(newRows[pos.y], pos.x, value);
+    return new World(newRows);
   }
 
   getRow(rowNumber: number): WorldRow<T> | null {
@@ -778,19 +856,31 @@ export namespace World {
   }
 }
 
+export type CharacterState = {
+  inventory: Inventory;
+  skills: Skill[];
+  artifacts: Artifact[];
+};
+
 export class Character {
   public inventory: Inventory;
   public skills: Skill[];
   public artifacts: Artifact[];
 
-  constructor() {
-    this.inventory = Inventory.createInitial();
-    this.skills = [];
-    this.artifacts = [];
+  constructor(init?: CharacterState) {
+    if (init === undefined) {
+      this.inventory = Inventory.createInitial();
+      this.skills = [];
+      this.artifacts = [];
+    } else {
+      this.inventory = init.inventory;
+      this.skills = init.skills;
+      this.artifacts = init.artifacts;
+    }
   }
 
   public withSkill(skill: Skill): Character {
-    if (skill in this.skills) {
+    if (this.skills.includes(skill)) {
       return this;
     }
     return {
@@ -800,7 +890,7 @@ export class Character {
   }
 
   public withArtifact(artifact: Artifact): Character {
-    if (artifact in this.artifacts) {
+    if (this.artifacts.includes(artifact)) {
       return this;
     }
     return {
@@ -812,13 +902,13 @@ export class Character {
   public storageCapacity(): number {
     return (
       2 +
-      (Skill.HeftyPockets in this.skills ? 1 : 0) +
-      (Artifact.LeatherBackpack in this.artifacts ? 1 : 0)
+      (this.skills.includes(Skill.HeftyPockets) ? 1 : 0) +
+      (this.artifacts.includes(Artifact.LeatherBackpack) ? 1 : 0)
     );
   }
 
   public movementSpeed(): number {
-    return 2 + (Skill.SwiftBoots in this.skills ? 1 : 0);
+    return 2 + (this.skills.includes(Skill.SwiftBoots) ? 1 : 0);
   }
 
   public canTraverse(cell: Cell): boolean {
@@ -827,9 +917,9 @@ export class Character {
     }
     switch (cell.terrain) {
       case WorldTerrainType.Forest:
-        return Skill.WoodlandExplorer in this.skills;
+        return this.skills.includes(Skill.WoodlandExplorer);
       case WorldTerrainType.Mountain:
-        return Skill.Mountaineering in this.skills;
+        return this.skills.includes(Skill.Mountaineering);
       case WorldTerrainType.Plains:
         return true;
       case WorldTerrainType.Lake:
@@ -837,22 +927,260 @@ export class Character {
         return false;
     }
   }
+
+  public gainItems(items: InventoryOpt): Character {
+    const newRubies = Math.min(
+      this.inventory.rubies + (items.rubies ?? 0),
+      this.storageCapacity()
+    );
+    const newAlchemy = { ...this.inventory.alchemy };
+    if (items.alchemy !== undefined) {
+      for (const key in items.alchemy) {
+        newAlchemy[key] = Math.min(
+          newAlchemy[key] + items.alchemy[key],
+          this.storageCapacity()
+        );
+      }
+    }
+    const newPages = { ...this.inventory.pages };
+    if (items.pages !== undefined) {
+      for (const key in items.pages) {
+        newPages[key] = Math.min(newPages[key] + items.pages[key], 4);
+      }
+    }
+    return {
+      ...this,
+      inventory: {
+        rubies: newRubies,
+        alchemy: newAlchemy,
+        pages: newPages,
+      },
+    };
+  }
 }
 
-export class GameState {
-  public character: Character;
-  public world: World<Cell>;
-  public charPos: Position;
-  public turnNumber: number;
+export type GameState = {
+  character: Character;
+  world: World<Cell>;
+  charPos: Position;
+  turnNumber: number;
+  lostPagesGenerator: LostPagesGenerator;
+  lastVisitedCave?: Position;
+};
 
-  public constructor(startPos: Position) {
+export namespace GameState {
+  export function initial(startPos: Position): GameState {
     const winit = World.init(worldInit);
     if ((winit.get(startPos) ?? WorldInit.Void) !== WorldInit.Start) {
       throw new Error("Invalid starting position");
     }
-    this.character = new Character();
-    this.world = winit.map(WorldInit.mapToCell);
-    this.charPos = startPos;
-    this.turnNumber = 0;
+    return {
+      character: new Character(),
+      world: winit.map(WorldInit.mapToCell),
+      charPos: startPos,
+      turnNumber: 0,
+      lostPagesGenerator: LostPagesGenerator.create(),
+    };
+  }
+}
+
+export class BootstrappedGame {
+  state: GameState;
+  rng: Prng;
+  player: IPlayer;
+  promptNumber: number;
+
+  public constructor(init: {
+    state: GameState;
+    rng: Prng;
+    player: IPlayer;
+    promptNumber: number;
+  }) {
+    this.state = init.state;
+    this.promptNumber = init.promptNumber;
+    this.rng = init.rng;
+    this.player = init.player;
+  }
+
+  public withState(newState: GameState): BootstrappedGame {
+    return new BootstrappedGame({ ...this, state: newState });
+  }
+
+  public nextPromptNumber(): BootstrappedGame {
+    return new BootstrappedGame({
+      ...this,
+      promptNumber: this.promptNumber + 1,
+    });
+  }
+}
+
+export enum GameActionType {
+  Move,
+  Interact,
+}
+
+export type GameAction = {
+  type: GameActionType;
+  target: Position;
+};
+
+function moveAction(
+  target: Position,
+  game: BootstrappedGame
+): BootstrappedGame | null {
+  const movementSpeed = game.state.character.movementSpeed();
+  const reachables = game.state.world.bfs(
+    game.state.charPos,
+    movementSpeed,
+    game.state.character.canTraverse
+  );
+  const reachablePositions = reachables.map((x) => x.pos);
+  const isReachable =
+    reachablePositions.filter((pos) => pos.x === target.x && pos.y === target.y)
+      .length > 0;
+  if (!isReachable) {
+    return null;
+  }
+  const cell = game.state.world.get(target)!;
+  if (cell.object !== undefined) {
+    return null;
+  }
+  return game.withState({
+    ...game.state,
+    turnNumber: game.state.turnNumber + 1,
+    charPos: target,
+    world: game.state.world.set(target, {
+      terrain: cell.terrain,
+      object: {
+        type: WorldObjectType.PreviouslyVisited,
+        data: {
+          turnNumber: game.state.turnNumber,
+        },
+      },
+    }),
+  });
+}
+
+function caveBarrel(prompt: Prompt, rng: IInput): InventoryOpt {
+  const options: InventoryOpt[] = [
+    {
+      rubies: 2,
+    },
+    { rubies: 3 },
+    { rubies: 1, alchemy: { Honey: 1, Mushroom: 1, Waterlily: 1 } },
+  ];
+  const gain = rng.chooseFromList(prompt, options);
+  return gain;
+}
+
+function enterCave(
+  pos: Position,
+  game: BootstrappedGame
+): BootstrappedGame | null {
+  if (pos === game.state.lastVisitedCave) {
+    return null;
+  }
+  const cell = game.state.world.get(pos);
+  if (
+    cell === null ||
+    cell.object === undefined ||
+    cell.object.type !== WorldObjectType.Cave
+  ) {
+    return null;
+  }
+
+  const ctx1: Prompt = {
+    context: "caveBarrel.1",
+    key: JSON.stringify([game.promptNumber, 0]),
+  };
+  const gain1 = caveBarrel(ctx1, game.rng);
+  game.player.show(ctx1, gain1);
+  const state1 = {
+    ...game.state,
+    character: game.state.character.gainItems(gain1),
+  };
+
+  const candWays = ["barrel"];
+  if (game.state.character.artifacts.length < 3) {
+    candWays.push("treasure");
+  }
+  const whichWay = game.player.chooseFromList(
+    {
+      context: "cave.whichWay",
+      key: JSON.stringify([game.promptNumber, 1]),
+    },
+    candWays
+  );
+
+  switch (whichWay) {
+    case "barrel": {
+      const ctx2: Prompt = {
+        context: "caveBarrel.2",
+        key: JSON.stringify([game.promptNumber, 2]),
+      };
+      const gain2 = caveBarrel(ctx2, game.rng);
+      game.player.show(ctx2, gain2);
+      const state2 = {
+        ...state1,
+        character: state1.character.gainItems(gain2),
+      };
+      return game.withState(state2).nextPromptNumber();
+    }
+    case "treasure": {
+      const ctx2: Prompt = {
+        context: "caveTreasure",
+        key: JSON.stringify([game.promptNumber, 2]),
+      };
+      const cands = [
+        Artifact.GoldenDie,
+        Artifact.LeatherBackpack,
+        Artifact.PortalStone,
+      ].filter((a) => !game.state.character.artifacts.includes(a));
+      const gainedArtifact = game.rng.chooseFromList(ctx2, cands);
+      game.player.show(ctx2, gainedArtifact);
+      const state2 = {
+        ...state1,
+        character: state1.character.withArtifact(gainedArtifact),
+      };
+      return game.withState(state2).nextPromptNumber();
+    }
+    default:
+      throw new Error("unexpected");
+  }
+}
+
+export function takeAction(
+  action: GameAction,
+  game: BootstrappedGame
+): BootstrappedGame | null {
+  switch (action.type) {
+    case GameActionType.Move:
+      return moveAction(action.target, game);
+    case GameActionType.Interact: {
+      const cell = game.state.world.get(action.target);
+      if (cell === null || cell.object === undefined) {
+        return null;
+      }
+      switch (cell.object.type) {
+        case WorldObjectType.Cave:
+          return enterCave(action.target, game);
+        case WorldObjectType.Market:
+          return null; // TODO
+        case WorldObjectType.Marlon:
+          return null; // TODO
+        case WorldObjectType.Merchant:
+          return null; // TODO
+        case WorldObjectType.Portal:
+          return null; // TODO
+        case WorldObjectType.ProductionBuilding:
+          return null; // TODO
+        case WorldObjectType.Sage:
+          return null; // TODO
+        case WorldObjectType.Village:
+          return null; // TODO
+        default:
+          return null;
+      }
+    }
   }
 }
