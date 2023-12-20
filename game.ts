@@ -1,4 +1,5 @@
 import { ControlledInput, IInput, IPlayer, Prng, Prompt } from "./entities";
+import { evalThunk } from "./utils";
 
 export enum AlchemicalResource {
   Mushroom = "Mushroom",
@@ -1144,7 +1145,7 @@ export class BootstrappedGame {
     return new BootstrappedGame({ ...this, state: newState });
   }
 
-  public nextPromptNumber(): BootstrappedGame {
+  public advancePromptNumber(): BootstrappedGame {
     return new BootstrappedGame({
       ...this,
       promptNumber: this.promptNumber + 1,
@@ -1302,7 +1303,7 @@ function enterCave(
     return null;
   }
 
-  return game.withState(state3).nextPromptNumber();
+  return game.withState(state3);
 }
 
 function interactWithPortal(
@@ -1753,43 +1754,49 @@ export function takeAction(
   action: GameAction,
   game: BootstrappedGame
 ): BootstrappedGame | null {
-  switch (action.type) {
-    case GameActionType.Move:
-      return moveAction(action.target, game);
-    case GameActionType.Interact: {
-      if (!Position.areAdjacent(action.target, game.state.charPos)) {
-        return null;
-      }
-      const cell = game.state.world.get(action.target);
-      if (cell === null) {
-        return null;
-      }
-      if (cell.object === undefined) {
-        return buildProductionBuilding(action.target, cell, game);
-      }
-      switch (cell.object.type) {
-        case WorldObjectType.Cave:
-          return enterCave(action.target, game);
-        case WorldObjectType.Market:
-          return interactWithMarket(game);
-        case WorldObjectType.Marlon:
-          return interactWithMarlon(game);
-        case WorldObjectType.Merchant:
-          return interactWithMerchant(game);
-        case WorldObjectType.Portal:
-          return interactWithPortal(action.target, game);
-        case WorldObjectType.ProductionBuilding:
-          return interactWithProductionBuilding(
-            cell.object.data.produces,
-            game
-          );
-        case WorldObjectType.Sage:
-          return null; // TODO
-        case WorldObjectType.Village:
-          return interactWithVillage(action.target, cell, game);
-        default:
+  const afterAction = evalThunk(() => {
+    switch (action.type) {
+      case GameActionType.Move:
+        return moveAction(action.target, game);
+      case GameActionType.Interact: {
+        if (!Position.areAdjacent(action.target, game.state.charPos)) {
           return null;
+        }
+        const cell = game.state.world.get(action.target);
+        if (cell === null) {
+          return null;
+        }
+        if (cell.object === undefined) {
+          return buildProductionBuilding(action.target, cell, game);
+        }
+        switch (cell.object.type) {
+          case WorldObjectType.Cave:
+            return enterCave(action.target, game);
+          case WorldObjectType.Market:
+            return interactWithMarket(game);
+          case WorldObjectType.Marlon:
+            return interactWithMarlon(game);
+          case WorldObjectType.Merchant:
+            return interactWithMerchant(game);
+          case WorldObjectType.Portal:
+            return interactWithPortal(action.target, game);
+          case WorldObjectType.ProductionBuilding:
+            return interactWithProductionBuilding(
+              cell.object.data.produces,
+              game
+            );
+          case WorldObjectType.Sage:
+            return null; // TODO
+          case WorldObjectType.Village:
+            return interactWithVillage(action.target, cell, game);
+          default:
+            return null;
+        }
       }
     }
+  });
+  if (afterAction === null) {
+    return null;
   }
+  return afterAction.advancePromptNumber();
 }
