@@ -559,7 +559,8 @@ export enum WorldObjectType {
 }
 
 export enum WorldInit {
-  Village = "v",
+  PlainsVillage = "V",
+  ForestVillage = "v",
   Market = "m",
   Portal = "p",
   Merchant = "M",
@@ -576,22 +577,22 @@ export enum WorldInit {
   Void = "X",
 }
 
-const worldInit: Array<[string, string]> = [
-  ["M  0  v ", "p"],
+const defaultWorld: Array<[string, string]> = [
+  ["M  0  V ", "p"],
   ["        ", "  "],
   ["     l  ", "   "],
-  ["f  v    ", "1  f"],
+  ["f  V    ", "1  f"],
   ["vf      ", "   fv"],
   ["ff     c", "^   ff"],
   ["     m  ", " ^     "],
   ["        ", "        "],
   ["p  3    ", "t   l   M"],
-  ["       ", "      v  "],
-  ["v  l  ", "   m     "],
+  ["       ", "      V  "],
+  ["V  l  ", "   m     "],
   ["     ", "c       0"],
   ["    ", " ^^      "],
   ["0  ", "     2 l "],
-  ["  ", "v        "],
+  ["  ", "V        "],
   [" ", "   ff    "],
   ["", "M  fvf  p"],
 ];
@@ -724,9 +725,17 @@ export namespace WorldInit {
         return {
           terrain: WorldTerrainType.Plains,
         };
-      case WorldInit.Village:
+      case WorldInit.PlainsVillage:
         return {
           terrain: WorldTerrainType.Plains,
+          object: {
+            type: WorldObjectType.Village,
+            data: Village.create(),
+          },
+        };
+      case WorldInit.ForestVillage:
+        return {
+          terrain: WorldTerrainType.Forest,
           object: {
             type: WorldObjectType.Village,
             data: Village.create(),
@@ -1064,14 +1073,16 @@ export type GameState = {
 };
 
 export namespace GameState {
-  export function initial(startPos: Position): GameState {
-    const winit = World.init(worldInit);
-    if ((winit.get(startPos) ?? WorldInit.Void) !== WorldInit.Start) {
+  export function initial(
+    worldInit: World<WorldInit>,
+    startPos: Position
+  ): GameState {
+    if ((worldInit.get(startPos) ?? WorldInit.Void) !== WorldInit.Start) {
       throw new Error("Invalid starting position");
     }
     return {
       character: new Character(),
-      world: winit.map(WorldInit.mapToCell),
+      world: worldInit.map(WorldInit.mapToCell),
       charPos: startPos,
       turnNumber: 0,
       lostPagesGenerator: LostPagesGenerator.create(),
@@ -1155,6 +1166,98 @@ export class BootstrappedGame {
     return new BootstrappedGame({
       ...this,
       promptNumber: this.promptNumber + 1,
+    });
+  }
+}
+
+export namespace BootstrappedGame {
+  export function startGame(
+    sourceRng: Prng,
+    player: IPlayer
+  ): BootstrappedGame {
+    const worldInit = World.init(defaultWorld);
+    const startPos = player.chooseFromList(
+      {
+        context: "startGame.startPos",
+        key: JSON.stringify([0, 0]),
+      },
+      worldInit.listHexes().flatMap(({ pos, value }) => {
+        if (value === WorldInit.Start) {
+          return [pos];
+        } else {
+          return [];
+        }
+      })
+    );
+    var initialState = GameState.initial(worldInit, startPos);
+    const whereHoney = player.chooseFromList(
+      {
+        context: "startGame.honeyBuilding",
+        key: JSON.stringify([0, 1]),
+      },
+      worldInit.listHexes().flatMap(({ pos, value }) => {
+        if (value === WorldInit.Mountain) {
+          return [pos];
+        } else {
+          return [];
+        }
+      })
+    );
+    const whereWaterlily = player.chooseFromList(
+      {
+        context: "startGame.waterlilyBuilding",
+        key: JSON.stringify([0, 2]),
+      },
+      worldInit.listHexes().flatMap(({ pos, value }) => {
+        if (value === WorldInit.Lake) {
+          return [pos];
+        } else {
+          return [];
+        }
+      })
+    );
+    const whereMushroom = player.chooseFromList(
+      {
+        context: "startGame.mushroomBuilding",
+        key: JSON.stringify([0, 3]),
+      },
+      worldInit.listHexes().flatMap(({ pos, value }) => {
+        if (value === WorldInit.Forest) {
+          return [pos];
+        } else {
+          return [];
+        }
+      })
+    );
+    return new BootstrappedGame({
+      state: {
+        ...initialState,
+        world: initialState.world
+          .set(whereHoney, {
+            terrain: WorldTerrainType.Mountain,
+            object: {
+              type: WorldObjectType.ProductionBuilding,
+              data: { produces: AlchemicalResource.Honey },
+            },
+          })
+          .set(whereMushroom, {
+            terrain: WorldTerrainType.Forest,
+            object: {
+              type: WorldObjectType.ProductionBuilding,
+              data: { produces: AlchemicalResource.Mushroom },
+            },
+          })
+          .set(whereWaterlily, {
+            terrain: WorldTerrainType.Lake,
+            object: {
+              type: WorldObjectType.ProductionBuilding,
+              data: { produces: AlchemicalResource.Waterlily },
+            },
+          }),
+      },
+      sourceRng,
+      player,
+      promptNumber: 1,
     });
   }
 }
@@ -1688,6 +1791,7 @@ function interactWithMarlon(game: BootstrappedGame): BootstrappedGame | null {
           game.state.character.inventory.alchemy[ingredientType]
         );
         contribution[ingredientType] = howMuch;
+        promptSubnumber += 1;
       }
       const result = Recipe.contributeIngredients({
         recipe,
