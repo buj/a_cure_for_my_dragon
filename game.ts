@@ -1701,6 +1701,54 @@ function interactWithMarlon(game: BootstrappedGame): BootstrappedGame | null {
   }
 }
 
+function interactWithMerchant(game: BootstrappedGame): BootstrappedGame | null {
+  if (!game.state.character.skills.includes(Skill.Negotiation)) {
+    return null;
+  }
+  const choices: Set<Dialect> = new Set();
+  for (const d in Dialect) {
+    if (
+      game.state.character.inventory.rawPages[d] > 0 ||
+      game.state.character.inventory.translatedPages[d] > 0
+    ) {
+      choices.add(d as Dialect);
+    }
+  }
+  if (choices.size === 0) {
+    return null;
+  }
+  const tradeWhat = game.player.chooseFromList(
+    {
+      context: "interactWithMerchant.tradeWhat",
+      key: JSON.stringify([game.promptNumber, 0]),
+    },
+    [...choices.values()]
+  );
+  const tradeFor = game.player.chooseFromList(
+    {
+      context: "interactWithMerchant.tradeFor",
+      key: JSON.stringify([game.promptNumber, 1]),
+    },
+    [Dialect.Bird, Dialect.Dragonfly, Dialect.Fish, Dialect.Mouse].filter(
+      (d) => d != tradeWhat
+    )
+  );
+  const cost: InventoryOpt =
+    game.state.character.inventory.rawPages[tradeWhat] > 0
+      ? { rawPages: { [tradeWhat]: 1 } }
+      : { translatedPages: { [tradeWhat]: 1 } };
+  const newCharacterState = game.state.character.tradeItems(cost, {
+    rawPages: { [tradeFor]: 1 },
+  });
+  if (newCharacterState === null) {
+    return null;
+  }
+  return game.withState({
+    ...game.state,
+    character: newCharacterState,
+  });
+}
+
 export function takeAction(
   action: GameAction,
   game: BootstrappedGame
@@ -1727,7 +1775,7 @@ export function takeAction(
         case WorldObjectType.Marlon:
           return interactWithMarlon(game);
         case WorldObjectType.Merchant:
-          return null; // TODO
+          return interactWithMerchant(game);
         case WorldObjectType.Portal:
           return interactWithPortal(action.target, game);
         case WorldObjectType.ProductionBuilding:
