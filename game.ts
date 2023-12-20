@@ -1171,7 +1171,7 @@ export class BootstrappedGame {
 }
 
 export namespace BootstrappedGame {
-  export function startGame(
+  export function createInitial(
     sourceRng: Prng,
     player: IPlayer
   ): BootstrappedGame {
@@ -1926,7 +1926,7 @@ function interactWithSage(
   });
 }
 
-export function takeAction(
+function takeAction(
   action: GameAction,
   game: BootstrappedGame
 ): BootstrappedGame | null {
@@ -1975,4 +1975,44 @@ export function takeAction(
     return null;
   }
   return afterAction.advancePromptNumber();
+}
+
+export function runGame(sourceRng: Prng, player: IPlayer) {
+  var game = BootstrappedGame.createInitial(sourceRng, player);
+  while (true) {
+    player.show(
+      {
+        context: "gameState",
+        key: JSON.stringify(game.promptNumber),
+      },
+      game.state
+    );
+    const possibleMoves: GameAction[] =
+      World.listCellsCanReachAndCanEndTurnThere(
+        game.state.world,
+        game.state.charPos,
+        game.state.character.movementSpeed(),
+        game.state.character.canTraverse
+      ).map(({ pos }) => ({
+        type: GameActionType.Move,
+        target: pos,
+      }));
+    const possibleInteractions: GameAction[] = game.state.world
+      .getAdjacents(game.state.charPos)
+      .map(({ pos }) => ({
+        type: GameActionType.Interact,
+        target: pos,
+      }));
+    const action = game.player.chooseFromList(
+      {
+        context: "chooseAction",
+        key: JSON.stringify(game.promptNumber),
+      },
+      [...possibleMoves, ...possibleInteractions]
+    );
+    const game2 = takeAction(action, game.advancePromptNumber());
+    if (game2 !== null) {
+      game = game2;
+    }
+  }
 }
