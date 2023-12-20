@@ -564,9 +564,9 @@ export enum WorldInit {
   Portal = "p",
   Merchant = "M",
   Cave = "c",
-  Sage1 = "1",
-  Sage2 = "2",
-  Sage3 = "3",
+  SageWithChimney = "1",
+  SageWithSharpRoof = "2",
+  SageWithSmoothRoof = "3",
   Marlon = "t",
   Forest = "f",
   Mountain = "^",
@@ -596,6 +596,12 @@ const worldInit: Array<[string, string]> = [
   ["", "M  fvf  p"],
 ];
 
+export enum SageId {
+  WithChimney,
+  SharpRoof,
+  SmoothRoof,
+}
+
 type WorldObject = {
   [WorldObjectType.Village]: {
     type: WorldObjectType.Village;
@@ -616,7 +622,7 @@ type WorldObject = {
   [WorldObjectType.Sage]: {
     type: WorldObjectType.Sage;
     data: {
-      id: 1 | 2 | 3;
+      id: SageId;
     };
   };
 } & {
@@ -684,33 +690,33 @@ export namespace WorldInit {
             type: WorldObjectType.Portal,
           },
         };
-      case WorldInit.Sage1:
+      case WorldInit.SageWithChimney:
         return {
           terrain: WorldTerrainType.Plains,
           object: {
             type: WorldObjectType.Sage,
             data: {
-              id: 1,
+              id: SageId.WithChimney,
             },
           },
         };
-      case WorldInit.Sage2:
+      case WorldInit.SageWithSharpRoof:
         return {
           terrain: WorldTerrainType.Plains,
           object: {
             type: WorldObjectType.Sage,
             data: {
-              id: 2,
+              id: SageId.SharpRoof,
             },
           },
         };
-      case WorldInit.Sage3:
+      case WorldInit.SageWithSmoothRoof:
         return {
           terrain: WorldTerrainType.Plains,
           object: {
             type: WorldObjectType.Sage,
             data: {
-              id: 3,
+              id: SageId.SmoothRoof,
             },
           },
         };
@@ -1750,6 +1756,72 @@ function interactWithMerchant(game: BootstrappedGame): BootstrappedGame | null {
   });
 }
 
+function sageLearnableSkills(sageId: SageId): Skill[] {
+  switch (sageId) {
+    case SageId.WithChimney:
+      return [Skill.HeftyPockets, Skill.Negotiation];
+    case SageId.SmoothRoof:
+      return [Skill.WoodlandExplorer, Skill.SwiftBoots];
+    case SageId.SharpRoof:
+      return [Skill.Mountaineering, Skill.Spelunking];
+  }
+}
+
+function interactWithSage(
+  sageId: SageId,
+  game: BootstrappedGame
+): BootstrappedGame | null {
+  const whatCanBeTranslated = [
+    Dialect.Bird,
+    Dialect.Dragonfly,
+    Dialect.Fish,
+    Dialect.Mouse,
+  ].filter((d) => game.state.character.inventory.rawPages[d] > 0);
+  if (whatCanBeTranslated.length === 0) {
+    return null;
+  }
+  const translateWhat = game.player.chooseFromList(
+    {
+      context: "interactWithSage.translateWhat",
+      key: JSON.stringify([game.promptNumber, 0]),
+    },
+    whatCanBeTranslated
+  );
+  const learnableSkills: Array<Skill | null> = [
+    ...sageLearnableSkills(sageId).filter(
+      (s) => !game.state.character.skills.includes(s)
+    ),
+    null,
+  ];
+  var newCharacterState = game.state.character.tradeItems(
+    { rawPages: { [translateWhat]: 1 } },
+    { translatedPages: { [translateWhat]: 1 } }
+  );
+  if (newCharacterState === null) {
+    return null;
+  }
+  const learnWhat =
+    learnableSkills.length > 1
+      ? game.player.chooseFromList(
+          {
+            context: "interactWithSage.learnWhat",
+            key: JSON.stringify([game.promptNumber, 1]),
+          },
+          learnableSkills
+        )
+      : null;
+  if (learnWhat !== null) {
+    newCharacterState = newCharacterState.withSkill(learnWhat);
+    if (newCharacterState === null) {
+      return null;
+    }
+  }
+  return game.withState({
+    ...game.state,
+    character: newCharacterState,
+  });
+}
+
 export function takeAction(
   action: GameAction,
   game: BootstrappedGame
@@ -1786,7 +1858,7 @@ export function takeAction(
               game
             );
           case WorldObjectType.Sage:
-            return null; // TODO
+            return interactWithSage(cell.object.data.id, game);
           case WorldObjectType.Village:
             return interactWithVillage(action.target, cell, game);
           default:
