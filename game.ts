@@ -325,12 +325,12 @@ export namespace Village {
 type Recipe0 = {
   dialect: null;
   numPages: number;
+  rubiesCost: number;
 };
 
 type Recipe1 = {
   dialect: Dialect;
   numPages: number;
-  numPagesCollected: number;
 };
 
 type Recipe2 = {
@@ -408,55 +408,6 @@ export namespace Recipe {
       };
     }
   }
-
-  export function contributePages(
-    promptKey: string,
-    rng: IInput,
-    input: {
-      recipe: Recipe;
-      inventory: Inventory;
-      contribution: number;
-      recipeGenerator: RecipeGenerator;
-    }
-  ): {
-    recipe: Recipe;
-    inventory: Inventory;
-    recipeGenerator: RecipeGenerator;
-  } | null {
-    const {
-      recipe,
-      inventory,
-      contribution: contributionRaw,
-      recipeGenerator,
-    } = input;
-    if (!("numPagesCollected" in recipe)) {
-      return null;
-    }
-    const contribution = Math.min(
-      contributionRaw,
-      recipe.numPages - recipe.numPagesCollected,
-      inventory.translatedPages[recipe.dialect]
-    );
-    if (contribution <= 0) {
-      return null;
-    }
-    const newInventory = Inventory.add(inventory, {
-      translatedPages: { [recipe.dialect]: -contribution },
-    });
-    var newRecipe: Recipe = recipe;
-    var newRecipeGenerator: RecipeGenerator = recipeGenerator;
-    if (recipe.numPagesCollected + contribution == recipe.numPages) {
-      const { recipeGenerator: recipeGenerator2, recipe: recipe2 } =
-        RecipeGenerator.generate(promptKey, rng, { recipeGenerator, recipe })!;
-      newRecipe = recipe2;
-      newRecipeGenerator = recipeGenerator2;
-    }
-    return {
-      recipe: newRecipe,
-      inventory: newInventory,
-      recipeGenerator: newRecipeGenerator,
-    };
-  }
 }
 
 enum IngredientsCombination {
@@ -532,13 +483,9 @@ export namespace RecipeGenerator {
         recipe: {
           dialect,
           numPages: recipe.numPages,
-          numPagesCollected: 0,
         },
       };
-    } else if (
-      "numPagesCollected" in recipe &&
-      recipe.numPagesCollected >= recipe.numPages
-    ) {
+    } else if (!("ingredients" in recipe)) {
       const { chosen: ingredientsCombo, rest: remainingIngredientsCombos } =
         IInput.chooseFromListWithoutReplacement(
           rng,
@@ -1105,6 +1052,8 @@ export type GameState = {
   turnNumber: number;
   lostPagesGenerator: LostPagesGenerator;
   lastVisitedCave?: Position;
+  recipes: Recipe[];
+  recipeGenerator: RecipeGenerator;
 };
 
 export namespace GameState {
@@ -1119,6 +1068,24 @@ export namespace GameState {
       charPos: startPos,
       turnNumber: 0,
       lostPagesGenerator: LostPagesGenerator.create(),
+      recipes: [
+        {
+          dialect: null,
+          numPages: 4,
+          rubiesCost: 1,
+        },
+        {
+          dialect: null,
+          numPages: 3,
+          rubiesCost: 2,
+        },
+        {
+          dialect: null,
+          numPages: 2,
+          rubiesCost: 3,
+        },
+      ],
+      recipeGenerator: RecipeGenerator.create(),
     };
   }
 
@@ -1573,6 +1540,167 @@ function interactWithMarket(game: BootstrappedGame): BootstrappedGame | null {
   });
 }
 
+export enum MarlonInteractionType {
+  RevealDialect,
+  RevealIngredients,
+  GiveIngredients,
+}
+
+function interactWithMarlon(game: BootstrappedGame): BootstrappedGame | null {
+  const interactionType = game.player.chooseFromList(
+    {
+      context: "interactWithMarlon.type",
+      key: JSON.stringify([game.promptNumber, 0]),
+    },
+    [
+      MarlonInteractionType.RevealDialect,
+      MarlonInteractionType.RevealIngredients,
+      MarlonInteractionType.GiveIngredients,
+    ]
+  );
+  switch (interactionType) {
+    case MarlonInteractionType.RevealDialect: {
+      const choices = [...game.state.recipes.entries()].flatMap(
+        ([idx, recipe]) => {
+          if (recipe.dialect === null) {
+            const result: [number, Recipe0] = [idx, recipe];
+            return [result];
+          } else {
+            return [];
+          }
+        }
+      );
+      const [idx, recipe] = game.player.chooseFromList(
+        {
+          context: "interactWithMarlon.revealDialect.whichRecipe",
+          key: JSON.stringify([game.promptNumber, 1]),
+        },
+        choices
+      );
+      const result = RecipeGenerator.generate(
+        JSON.stringify([game.promptNumber, 2]),
+        game.rng(),
+        {
+          recipeGenerator: game.state.recipeGenerator,
+          recipe,
+        }
+      );
+      if (result === null) {
+        return null;
+      }
+      const newRecipes = [...game.state.recipes];
+      newRecipes[idx] = result.recipe;
+      const newInventory = Inventory.subtract(game.state.character.inventory, {
+        rubies: recipe.rubiesCost,
+      });
+      if (newInventory === null) {
+        return null;
+      }
+      return game.withState({
+        ...game.state,
+        recipes: newRecipes,
+        recipeGenerator: result.recipeGenerator,
+        character: game.state.character.withInventory(newInventory),
+      });
+    }
+    case MarlonInteractionType.RevealIngredients: {
+      const choices = [...game.state.recipes.entries()].flatMap(
+        ([idx, recipe]) => {
+          if (recipe.dialect !== null && !("ingredients" in recipe)) {
+            const result: [number, Recipe1] = [idx, recipe];
+            return [result];
+          } else {
+            return [];
+          }
+        }
+      );
+      const [idx, recipe] = game.player.chooseFromList(
+        {
+          context: "interactWithMarlon.revealIngredients.whichRecipe",
+          key: JSON.stringify([game.promptNumber, 1]),
+        },
+        choices
+      );
+      const result = RecipeGenerator.generate(
+        JSON.stringify([game.promptNumber, 2]),
+        game.rng(),
+        {
+          recipeGenerator: game.state.recipeGenerator,
+          recipe,
+        }
+      );
+      if (result === null) {
+        return null;
+      }
+      const newRecipes = [...game.state.recipes];
+      newRecipes[idx] = result.recipe;
+      const newInventory = Inventory.subtract(game.state.character.inventory, {
+        translatedPages: { [recipe.dialect]: recipe.numPages },
+      });
+      if (newInventory === null) {
+        return null;
+      }
+      return game.withState({
+        ...game.state,
+        recipes: newRecipes,
+        recipeGenerator: result.recipeGenerator,
+        character: game.state.character.withInventory(newInventory),
+      });
+    }
+    case MarlonInteractionType.GiveIngredients: {
+      const choices = [...game.state.recipes.entries()].flatMap(
+        ([idx, recipe]) => {
+          if ("ingredientsCollected" in recipe) {
+            const result: [number, Recipe2] = [idx, recipe];
+            return [result];
+          } else {
+            return [];
+          }
+        }
+      );
+      const [idx, recipe] = game.player.chooseFromList(
+        {
+          context: "interactWithMarlon.giveIngredients.whichRecipe",
+          key: JSON.stringify([game.promptNumber, 1]),
+        },
+        choices
+      );
+      var promptSubnumber = 2;
+      const contribution: { [key in AlchemicalResource]: number } = {
+        Mushroom: 0,
+        Honey: 0,
+        Waterlily: 0,
+      };
+      for (const ingredientType in recipe.ingredients) {
+        const howMuch = game.player.chooseFromRange(
+          {
+            context: "interactWithMerlon.giveIngredients.ingredientsAmounts",
+            key: JSON.stringify([game.promptNumber, promptSubnumber]),
+          },
+          0,
+          game.state.character.inventory.alchemy[ingredientType]
+        );
+        contribution[ingredientType] = howMuch;
+      }
+      const result = Recipe.contributeIngredients({
+        recipe,
+        inventory: game.state.character.inventory,
+        contribution,
+      });
+      if (result === null) {
+        return null;
+      }
+      const newRecipes = [...game.state.recipes];
+      newRecipes[idx] = result.recipe;
+      return game.withState({
+        ...game.state,
+        recipes: newRecipes,
+        character: game.state.character.withInventory(result.inventory),
+      });
+    }
+  }
+}
+
 export function takeAction(
   action: GameAction,
   game: BootstrappedGame
@@ -1597,7 +1725,7 @@ export function takeAction(
         case WorldObjectType.Market:
           return interactWithMarket(game);
         case WorldObjectType.Marlon:
-          return null; // TODO
+          return interactWithMarlon(game);
         case WorldObjectType.Merchant:
           return null; // TODO
         case WorldObjectType.Portal:
