@@ -1310,6 +1310,9 @@ function enterCave(
   pos: Position,
   game: BootstrappedGame
 ): BootstrappedGame | null {
+  if (!game.state.character.skills.includes(Skill.Spelunking)) {
+    return null;
+  }
   if (pos === game.state.lastVisitedCave) {
     return null;
   }
