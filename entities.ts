@@ -117,9 +117,9 @@ export class Prng {
 
   public constructor(seed: string | PrngState) {
     if (seed instanceof PrngState) {
-      this.rng = new seedrandom("", { state: seed.state });
+      this.rng = seedrandom("", { state: seed.state });
     } else {
-      this.rng = new seedrandom(seed, { state: true });
+      this.rng = seedrandom(seed, { state: true });
     }
     this.history = {};
   }
