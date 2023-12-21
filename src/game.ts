@@ -323,25 +323,25 @@ export namespace Village {
   }
 }
 
-type Recipe0 = {
+export type Recipe0 = {
   dialect: null;
   numPages: number;
   rubiesCost: number;
 };
 
-type Recipe1 = {
+export type Recipe1 = {
   dialect: Dialect;
   numPages: number;
 };
 
-type Recipe2 = {
+export type Recipe2 = {
   dialect: Dialect;
   numPages: number;
   ingredients: { [key in AlchemicalResource]?: number };
   ingredientsCollected: { [key in AlchemicalResource]?: number };
 };
 
-type Recipe3 = {
+export type Recipe3 = {
   dialect: Dialect;
   numPages: number;
   ingredients: { [key in AlchemicalResource]?: number };
@@ -411,28 +411,9 @@ export namespace Recipe {
   }
 }
 
-enum IngredientsCombination {
-  HoneyWaterlily,
-  WaterlilyMushroom,
-  MushroomHoney,
-}
-
-function ingredientsCombinationToList(
-  c: IngredientsCombination
-): AlchemicalResource[] {
-  switch (c) {
-    case IngredientsCombination.HoneyWaterlily:
-      return [AlchemicalResource.Honey, AlchemicalResource.Waterlily];
-    case IngredientsCombination.MushroomHoney:
-      return [AlchemicalResource.Mushroom, AlchemicalResource.Honey];
-    case IngredientsCombination.WaterlilyMushroom:
-      return [AlchemicalResource.Waterlily, AlchemicalResource.Mushroom];
-  }
-}
-
 export type RecipeGenerator = {
   remainingDialects: Dialect[];
-  ingredientsRemainingCombinations: IngredientsCombination[];
+  ingredientsRemainingCombinations: Array<AlchemicalResource[]>;
   ingredientsRemainingCounts: number[];
 };
 
@@ -446,9 +427,9 @@ export namespace RecipeGenerator {
         Dialect.Mouse,
       ],
       ingredientsRemainingCombinations: [
-        IngredientsCombination.HoneyWaterlily,
-        IngredientsCombination.WaterlilyMushroom,
-        IngredientsCombination.MushroomHoney,
+        [AlchemicalResource.Honey, AlchemicalResource.Waterlily],
+        [AlchemicalResource.Waterlily, AlchemicalResource.Mushroom],
+        [AlchemicalResource.Mushroom, AlchemicalResource.Honey],
       ],
       ingredientsRemainingCounts: [1, 2, 2, 3, 3, 4],
     };
@@ -496,8 +477,7 @@ export namespace RecipeGenerator {
           },
           recipeGenerator.ingredientsRemainingCombinations
         );
-      const [ingredient1, ingredient2] =
-        ingredientsCombinationToList(ingredientsCombo);
+      const [ingredient1, ingredient2] = ingredientsCombo;
       const { chosen: count1, rest: ingredientsRemainingCounts } =
         IInput.chooseFromListWithoutReplacement(
           rng,
