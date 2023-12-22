@@ -204,12 +204,12 @@ export namespace LostPagesGenerator {
     };
   }
 
-  export function generate(
+  export async function generate(
     prompt: Prompt,
     rng: IInput,
     generator: LostPagesGenerator
-  ): { lostPage: LostPage; generator: LostPagesGenerator } {
-    const shift = rng.chooseFromRange(prompt, 0, 5);
+  ): Promise<{ lostPage: LostPage; generator: LostPagesGenerator }> {
+    const shift = await rng.chooseFromRange(prompt, 0, 5);
     const idx = (generator.pos + shift) % generator.wheel.length;
     return {
       lostPage: generator.wheel[idx],
@@ -239,17 +239,20 @@ export namespace Village {
     return { pages: [] };
   }
 
-  export function revealFirstPage(
+  export async function revealFirstPage(
     prompt: Prompt,
     rng: IInput,
     input: { village: Village; lostPagesGenerator: LostPagesGenerator }
-  ): { village: Village; lostPagesGenerator: LostPagesGenerator } | null {
+  ): Promise<{
+    village: Village;
+    lostPagesGenerator: LostPagesGenerator;
+  } | null> {
     const { village, lostPagesGenerator } = input;
     if (village.pages.length != 0) {
       return null;
     }
     const { lostPage, generator: newLostPagesGenerator } =
-      LostPagesGenerator.generate(prompt, rng, lostPagesGenerator);
+      await LostPagesGenerator.generate(prompt, rng, lostPagesGenerator);
     return {
       village: {
         pages: [
@@ -264,7 +267,7 @@ export namespace Village {
     };
   }
 
-  export function purchasePage(
+  export async function purchasePage(
     prompt: Prompt,
     rng: IInput,
     input: {
@@ -272,11 +275,11 @@ export namespace Village {
       village: Village;
       lostPagesGenerator: LostPagesGenerator;
     }
-  ): {
+  ): Promise<{
     inventory: Inventory;
     village: Village;
     lostPagesGenerator: LostPagesGenerator;
-  } | null {
+  } | null> {
     const { inventory, village, lostPagesGenerator } = input;
     const currPage = village.pages.slice(-1)[0];
     if (currPage.purchased) {
@@ -297,7 +300,7 @@ export namespace Village {
     };
     var newLostPagesGenerator = lostPagesGenerator;
     if (village.pages.length < 2) {
-      const { lostPage, generator } = LostPagesGenerator.generate(
+      const { lostPage, generator } = await LostPagesGenerator.generate(
         prompt,
         rng,
         lostPagesGenerator
@@ -435,21 +438,21 @@ export namespace RecipeGenerator {
     };
   }
 
-  export function generate(
+  export async function generate(
     promptKey: string,
     rng: IInput,
     input: {
       recipeGenerator: RecipeGenerator;
       recipe: Recipe;
     }
-  ): {
+  ): Promise<{
     recipeGenerator: RecipeGenerator;
     recipe: Recipe;
-  } | null {
+  } | null> {
     const { recipeGenerator, recipe } = input;
     if (recipe.dialect === null) {
       const { chosen: dialect, rest: remainingDialects } =
-        IInput.chooseFromListWithoutReplacement(
+        await IInput.chooseFromListWithoutReplacement(
           rng,
           {
             context: "RecipeGenerator.generate.dialect",
@@ -469,7 +472,7 @@ export namespace RecipeGenerator {
       };
     } else if (!("ingredients" in recipe)) {
       const { chosen: ingredientsCombo, rest: remainingIngredientsCombos } =
-        IInput.chooseFromListWithoutReplacement(
+        await IInput.chooseFromListWithoutReplacement(
           rng,
           {
             context: "RecipeGenerator.generate.ingredients",
@@ -479,7 +482,7 @@ export namespace RecipeGenerator {
         );
       const [ingredient1, ingredient2] = ingredientsCombo;
       const { chosen: count1, rest: ingredientsRemainingCounts } =
-        IInput.chooseFromListWithoutReplacement(
+        await IInput.chooseFromListWithoutReplacement(
           rng,
           {
             context: "RecipeGenerator.generate.ingredients",
@@ -488,7 +491,7 @@ export namespace RecipeGenerator {
           recipeGenerator.ingredientsRemainingCounts
         );
       const { chosen: count2, rest: ingredientsRemainingCounts2 } =
-        IInput.chooseFromListWithoutReplacement(
+        await IInput.chooseFromListWithoutReplacement(
           rng,
           {
             context: "RecipeGenerator.generate.ingredients",
@@ -1151,12 +1154,12 @@ export class BootstrappedGame {
 }
 
 export namespace BootstrappedGame {
-  export function createInitial(
+  export async function createInitial(
     sourceRng: Prng,
     player: IPlayer
-  ): BootstrappedGame {
+  ): Promise<BootstrappedGame> {
     const worldInit = World.init(defaultWorld);
-    const startPos = player.chooseFromList(
+    const startPos = await player.chooseFromList(
       {
         context: "startGame.startPos",
         key: JSON.stringify([0, 0]),
@@ -1170,7 +1173,7 @@ export namespace BootstrappedGame {
       })
     );
     var initialState = GameState.initial(worldInit, startPos);
-    const whereHoney = player.chooseFromList(
+    const whereHoney = await player.chooseFromList(
       {
         context: "startGame.honeyBuilding",
         key: JSON.stringify([0, 1]),
@@ -1183,7 +1186,7 @@ export namespace BootstrappedGame {
         }
       })
     );
-    const whereWaterlily = player.chooseFromList(
+    const whereWaterlily = await player.chooseFromList(
       {
         context: "startGame.waterlilyBuilding",
         key: JSON.stringify([0, 2]),
@@ -1196,7 +1199,7 @@ export namespace BootstrappedGame {
         }
       })
     );
-    const whereMushroom = player.chooseFromList(
+    const whereMushroom = await player.chooseFromList(
       {
         context: "startGame.mushroomBuilding",
         key: JSON.stringify([0, 3]),
@@ -1274,7 +1277,7 @@ function moveAction(
   return game.withState(newState);
 }
 
-function caveBarrel(prompt: Prompt, rng: IInput): InventoryOpt {
+function caveBarrel(prompt: Prompt, rng: IInput): Promise<InventoryOpt> {
   const options: InventoryOpt[] = [
     {
       rubies: 2,
@@ -1286,10 +1289,10 @@ function caveBarrel(prompt: Prompt, rng: IInput): InventoryOpt {
   return gain;
 }
 
-function enterCave(
+async function enterCave(
   pos: Position,
   game: BootstrappedGame
-): BootstrappedGame | null {
+): Promise<BootstrappedGame | null> {
   if (!game.state.character.skills.includes(Skill.Spelunking)) {
     return null;
   }
@@ -1321,7 +1324,7 @@ function enterCave(
     context: "caveBarrel.1",
     key: JSON.stringify([game.promptNumber, 0]),
   };
-  const gain1 = caveBarrel(ctx1, game.rng());
+  const gain1 = await caveBarrel(ctx1, game.rng());
   game.player.show(ctx1, gain1);
   const state1 = {
     ...game.state,
@@ -1334,7 +1337,7 @@ function enterCave(
   if (game.state.character.artifacts.length < 3) {
     candWays.push("treasure");
   }
-  const whichWay = game.player.chooseFromList(
+  const whichWay = await game.player.chooseFromList(
     {
       context: "cave.whichWay",
       key: JSON.stringify([game.promptNumber, 1]),
@@ -1349,7 +1352,7 @@ function enterCave(
         context: "caveBarrel.2",
         key: JSON.stringify([game.promptNumber, 2]),
       };
-      const gain2 = caveBarrel(ctx2, game.rng());
+      const gain2 = await caveBarrel(ctx2, game.rng());
       game.player.show(ctx2, gain2);
       state2 = {
         ...state1,
@@ -1367,7 +1370,7 @@ function enterCave(
         Artifact.LeatherBackpack,
         Artifact.PortalStone,
       ].filter((a) => !game.state.character.artifacts.includes(a));
-      const gainedArtifact = game.rng().chooseFromList(ctx2, cands);
+      const gainedArtifact = await game.rng().chooseFromList(ctx2, cands);
       game.player.show(ctx2, gainedArtifact);
       state2 = {
         ...state1,
@@ -1383,7 +1386,7 @@ function enterCave(
 
   state2.turnNumber += 3;
   state2.lastVisitedCave = pos;
-  const exitPos = game.player.chooseFromList(
+  const exitPos = await game.player.chooseFromList(
     {
       context: "caveExit",
       key: JSON.stringify([game.promptNumber, 3]),
@@ -1398,10 +1401,10 @@ function enterCave(
   return game.withState(state3);
 }
 
-function interactWithPortal(
+async function interactWithPortal(
   portalPos: Position,
   game: BootstrappedGame
-): BootstrappedGame | null {
+): Promise<BootstrappedGame | null> {
   if (!game.state.character.artifacts.includes(Artifact.PortalStone)) {
     return null;
   }
@@ -1424,7 +1427,7 @@ function interactWithPortal(
       game.state.character.canTraverse
     ).map(({ pos }) => pos)
   );
-  const dest = game.player.chooseFromList(
+  const dest = await game.player.chooseFromList(
     {
       context: "portalDestination",
       key: JSON.stringify(game.promptNumber),
@@ -1489,11 +1492,11 @@ function interactWithProductionBuilding(
   });
 }
 
-function interactWithVillage(
+async function interactWithVillage(
   pos: Position,
   cell: Cell,
   game: BootstrappedGame
-): BootstrappedGame | null {
+): Promise<BootstrappedGame | null> {
   if (
     cell.object === undefined ||
     cell.object.type !== WorldObjectType.Village
@@ -1502,7 +1505,7 @@ function interactWithVillage(
   }
   const village = cell.object.data;
   if (village.pages.length === 0) {
-    const afterReveal = Village.revealFirstPage(
+    const afterReveal = await Village.revealFirstPage(
       {
         context: "interactWithVillage.revealFirstPage",
         key: JSON.stringify(game.promptNumber),
@@ -1529,7 +1532,7 @@ function interactWithVillage(
     };
     return game.withState(newState);
   } else {
-    const afterPurchase = Village.purchasePage(
+    const afterPurchase = await Village.purchasePage(
       {
         context: "interactWithVillage.purchasePage",
         key: JSON.stringify(game.promptNumber),
@@ -1569,8 +1572,10 @@ export enum MarketTradeType {
   GoodsForRuby,
 }
 
-function interactWithMarket(game: BootstrappedGame): BootstrappedGame | null {
-  const tradeType = game.player.chooseFromList(
+async function interactWithMarket(
+  game: BootstrappedGame
+): Promise<BootstrappedGame | null> {
+  const tradeType = await game.player.chooseFromList(
     {
       context: "interactWithMarket.tradeType",
       key: JSON.stringify([game.promptNumber, 0]),
@@ -1590,7 +1595,7 @@ function interactWithMarket(game: BootstrappedGame): BootstrappedGame | null {
   var rhs: InventoryOpt;
   switch (tradeType) {
     case MarketTradeType.GoodForGood: {
-      [lhs, rhs] = game.player.chooseFromList(prompt2, [
+      [lhs, rhs] = await game.player.chooseFromList(prompt2, [
         [{ alchemy: { Mushroom: 1 } }, { alchemy: { Honey: 1 } }],
         [{ alchemy: { Mushroom: 1 } }, { alchemy: { Waterlily: 1 } }],
         [{ alchemy: { Honey: 1 } }, { alchemy: { Mushroom: 1 } }],
@@ -1601,7 +1606,7 @@ function interactWithMarket(game: BootstrappedGame): BootstrappedGame | null {
       break;
     }
     case MarketTradeType.RubyForGoods: {
-      [lhs, rhs] = game.player.chooseFromList(prompt2, [
+      [lhs, rhs] = await game.player.chooseFromList(prompt2, [
         [{ rubies: 1 }, { alchemy: { Honey: 2 } }],
         [{ rubies: 1 }, { alchemy: { Mushroom: 2 } }],
         [{ rubies: 1 }, { alchemy: { Waterlily: 2 } }],
@@ -1612,7 +1617,7 @@ function interactWithMarket(game: BootstrappedGame): BootstrappedGame | null {
       break;
     }
     case MarketTradeType.GoodsForRuby: {
-      [lhs, rhs] = game.player.chooseFromList(prompt2, [
+      [lhs, rhs] = await game.player.chooseFromList(prompt2, [
         [{ alchemy: { Honey: 2 } }, { rubies: 1 }],
         [{ alchemy: { Mushroom: 2 } }, { rubies: 1 }],
         [{ alchemy: { Waterlily: 2 } }, { rubies: 1 }],
@@ -1639,8 +1644,10 @@ export enum MarlonInteractionType {
   GiveIngredients,
 }
 
-function interactWithMarlon(game: BootstrappedGame): BootstrappedGame | null {
-  const interactionType = game.player.chooseFromList(
+async function interactWithMarlon(
+  game: BootstrappedGame
+): Promise<BootstrappedGame | null> {
+  const interactionType = await game.player.chooseFromList(
     {
       context: "interactWithMarlon.type",
       key: JSON.stringify([game.promptNumber, 0]),
@@ -1663,14 +1670,14 @@ function interactWithMarlon(game: BootstrappedGame): BootstrappedGame | null {
           }
         }
       );
-      const [idx, recipe] = game.player.chooseFromList(
+      const [idx, recipe] = await game.player.chooseFromList(
         {
           context: "interactWithMarlon.revealDialect.whichRecipe",
           key: JSON.stringify([game.promptNumber, 1]),
         },
         choices
       );
-      const result = RecipeGenerator.generate(
+      const result = await RecipeGenerator.generate(
         JSON.stringify([game.promptNumber, 2]),
         game.rng(),
         {
@@ -1707,14 +1714,14 @@ function interactWithMarlon(game: BootstrappedGame): BootstrappedGame | null {
           }
         }
       );
-      const [idx, recipe] = game.player.chooseFromList(
+      const [idx, recipe] = await game.player.chooseFromList(
         {
           context: "interactWithMarlon.revealIngredients.whichRecipe",
           key: JSON.stringify([game.promptNumber, 1]),
         },
         choices
       );
-      const result = RecipeGenerator.generate(
+      const result = await RecipeGenerator.generate(
         JSON.stringify([game.promptNumber, 2]),
         game.rng(),
         {
@@ -1751,7 +1758,7 @@ function interactWithMarlon(game: BootstrappedGame): BootstrappedGame | null {
           }
         }
       );
-      const [idx, recipe] = game.player.chooseFromList(
+      const [idx, recipe] = await game.player.chooseFromList(
         {
           context: "interactWithMarlon.giveIngredients.whichRecipe",
           key: JSON.stringify([game.promptNumber, 1]),
@@ -1795,7 +1802,9 @@ function interactWithMarlon(game: BootstrappedGame): BootstrappedGame | null {
   }
 }
 
-function interactWithMerchant(game: BootstrappedGame): BootstrappedGame | null {
+async function interactWithMerchant(
+  game: BootstrappedGame
+): Promise<BootstrappedGame | null> {
   if (!game.state.character.skills.includes(Skill.Negotiation)) {
     return null;
   }
@@ -1811,14 +1820,14 @@ function interactWithMerchant(game: BootstrappedGame): BootstrappedGame | null {
   if (choices.size === 0) {
     return null;
   }
-  const tradeWhat = game.player.chooseFromList(
+  const tradeWhat = await game.player.chooseFromList(
     {
       context: "interactWithMerchant.tradeWhat",
       key: JSON.stringify([game.promptNumber, 0]),
     },
     [...choices.values()]
   );
-  const tradeFor = game.player.chooseFromList(
+  const tradeFor = await game.player.chooseFromList(
     {
       context: "interactWithMerchant.tradeFor",
       key: JSON.stringify([game.promptNumber, 1]),
@@ -1854,10 +1863,10 @@ function sageLearnableSkills(sageId: SageId): Skill[] {
   }
 }
 
-function interactWithSage(
+async function interactWithSage(
   sageId: SageId,
   game: BootstrappedGame
-): BootstrappedGame | null {
+): Promise<BootstrappedGame | null> {
   const whatCanBeTranslated = [
     Dialect.Bird,
     Dialect.Dragonfly,
@@ -1867,7 +1876,7 @@ function interactWithSage(
   if (whatCanBeTranslated.length === 0) {
     return null;
   }
-  const translateWhat = game.player.chooseFromList(
+  const translateWhat = await game.player.chooseFromList(
     {
       context: "interactWithSage.translateWhat",
       key: JSON.stringify([game.promptNumber, 0]),
@@ -1889,7 +1898,7 @@ function interactWithSage(
   }
   const learnWhat =
     learnableSkills.length > 1
-      ? game.player.chooseFromList(
+      ? await game.player.chooseFromList(
           {
             context: "interactWithSage.learnWhat",
             key: JSON.stringify([game.promptNumber, 1]),
@@ -1909,11 +1918,11 @@ function interactWithSage(
   });
 }
 
-function takeAction(
+async function takeAction(
   action: GameAction,
   game: BootstrappedGame
-): BootstrappedGame | null {
-  const afterAction = evalThunk(() => {
+): Promise<BootstrappedGame | null> {
+  const afterAction = await evalThunk(async () => {
     switch (action.type) {
       case GameActionType.Move:
         return moveAction(action.target, game);
@@ -1960,8 +1969,8 @@ function takeAction(
   return afterAction.advancePromptNumber();
 }
 
-export function runGame(sourceRng: Prng, player: IPlayer) {
-  var game = BootstrappedGame.createInitial(sourceRng, player);
+export async function runGame(sourceRng: Prng, player: IPlayer) {
+  var game = await BootstrappedGame.createInitial(sourceRng, player);
   while (true) {
     player.show(
       {
@@ -1986,14 +1995,14 @@ export function runGame(sourceRng: Prng, player: IPlayer) {
         type: GameActionType.Interact,
         target: pos,
       }));
-    const action = game.player.chooseFromList(
+    const action = await game.player.chooseFromList(
       {
         context: "chooseAction",
         key: JSON.stringify(game.promptNumber),
       },
       [...possibleMoves, ...possibleInteractions]
     );
-    const game2 = takeAction(action, game.advancePromptNumber());
+    const game2 = await takeAction(action, game.advancePromptNumber());
     if (game2 !== null) {
       game = game2;
     }

@@ -6,20 +6,20 @@ export type Prompt = {
 };
 
 export interface IInput {
-  chooseFromRange(prompt: Prompt, l: number, r: number): number;
-  chooseFromList<T>(prompt: Prompt, ls: T[]): T;
+  chooseFromRange(prompt: Prompt, l: number, r: number): Promise<number>;
+  chooseFromList<T>(prompt: Prompt, ls: T[]): Promise<T>;
 }
 
 export namespace IInput {
-  export function chooseFromListWithoutReplacement<T>(
+  export async function chooseFromListWithoutReplacement<T>(
     input: IInput,
     prompt: Prompt,
     ls: T[]
-  ): {
+  ): Promise<{
     chosen: T;
     rest: T[];
-  } {
-    const idx = input.chooseFromRange(prompt, 0, ls.length - 1);
+  }> {
+    const idx = await input.chooseFromRange(prompt, 0, ls.length - 1);
     return {
       chosen: ls[idx],
       rest: [...ls.slice(0, idx), ...ls.slice(idx + 1)],
@@ -35,19 +35,23 @@ export class RecordedInput {
   fallback: IInput;
   recording: Record<string, number>;
 
-  public chooseFromRange(prompt: Prompt, l: number, r: number): number {
+  public chooseFromRange(
+    prompt: Prompt,
+    l: number,
+    r: number
+  ): Promise<number> {
     if (prompt.key in this.recording) {
       const result = this.recording[prompt.key];
       if (result < l || result > r) {
         throw new Error("recording does not satisfy input constraints");
       }
-      return result;
+      return Promise.resolve(result);
     }
     return this.fallback.chooseFromRange(prompt, l, r);
   }
 
-  public chooseFromList<T>(prompt: Prompt, ls: T[]): T {
-    const idx = this.chooseFromRange(prompt, 0, ls.length - 1);
+  public async chooseFromList<T>(prompt: Prompt, ls: T[]): Promise<T> {
+    const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
     return ls[idx];
   }
 }
@@ -61,7 +65,11 @@ export class ControlledInput {
     this.controller = controller;
   }
 
-  public chooseFromRange(prompt: Prompt, l: number, r: number): number {
+  public async chooseFromRange(
+    prompt: Prompt,
+    l: number,
+    r: number
+  ): Promise<number> {
     const srcChoice = this.source.chooseFromRange(
       {
         context: prompt.context,
@@ -70,7 +78,7 @@ export class ControlledInput {
       l,
       r
     );
-    const keep = this.controller.chooseFromList(
+    const keep = await this.controller.chooseFromList(
       {
         context: {
           0: "keepOrReroll",
@@ -95,8 +103,8 @@ export class ControlledInput {
     }
   }
 
-  public chooseFromList<T>(prompt: Prompt, ls: T[]): T {
-    const idx = this.chooseFromRange(prompt, 0, ls.length - 1);
+  public async chooseFromList<T>(prompt: Prompt, ls: T[]): Promise<T> {
+    const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
     return ls[idx];
   }
 }
@@ -128,17 +136,21 @@ export class Prng {
     return this.history;
   }
 
-  public chooseFromRange(prompt: Prompt, l: number, r: number): number {
+  public chooseFromRange(
+    prompt: Prompt,
+    l: number,
+    r: number
+  ): Promise<number> {
     if (r < l) {
       throw new Error("random choice from empty range");
     }
     const result = l + (this.rng.int32() % (r - l + 1));
     this.history[prompt.key] = result;
-    return result;
+    return Promise.resolve(result);
   }
 
-  public chooseFromList<T>(prompt: Prompt, ls: T[]): T {
-    const idx = this.chooseFromRange(prompt, 0, ls.length - 1);
+  public async chooseFromList<T>(prompt: Prompt, ls: T[]): Promise<T> {
+    const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
     return ls[idx];
   }
 
