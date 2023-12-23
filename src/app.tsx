@@ -372,7 +372,7 @@ function DialogueEntryVisualization(d: DialogueEntry) {
       });
       return (
         <div key={`S(${d.data.prompt.key})`} className="historyShowEntry">
-          {content}
+          💬: {content}
         </div>
       );
     }
@@ -386,6 +386,72 @@ function HistoryWidget(deps: { history: DialogueHistory }) {
       {history.getHistory().map(DialogueEntryVisualization)}
     </div>
   );
+}
+
+function isPositionalQuestion(ctx: QuestionContext): boolean {
+  switch (ctx) {
+    case "caveExit":
+    case "chooseAction":
+    case "portalDestination":
+    case "startGame.honeyBuilding":
+    case "startGame.mushroomBuilding":
+    case "startGame.waterlilyBuilding":
+    case "startGame.startPos":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function ActiveQuestionWidget(deps: { question: Question }) {
+  const { question: q } = deps;
+  const questionText = translateQuestionContext(q.prompt.context);
+  if (isPositionalQuestion(q.prompt.context)) {
+    return <div className="activeQuestion">{questionText}</div>;
+  }
+  switch (q.query.type) {
+    case "chooseFromList": {
+      const optionsButtons = [...q.query.ls.entries()].map(([idx, option]) => {
+        const clickHandler = () => {
+          q.answer.resolve(idx);
+        };
+        return (
+          <button key={idx} onClick={clickHandler}>
+            {JSON.stringify(option)}
+          </button>
+        );
+      });
+      return (
+        <div className="activeQuestion">
+          {questionText}
+          {optionsButtons}
+        </div>
+      );
+    }
+    case "chooseFromRange": {
+      const [value, setValue] = React.useState(q.query.l);
+      const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setValue(parseInt(e.target.value));
+      };
+      const submit = () => {
+        q.answer.resolve(value);
+      };
+      return (
+        <div className="activeQuestion">
+          {questionText}
+          <input
+            type="number"
+            min={q.query.l}
+            max={q.query.r}
+            step="1"
+            defaultValue={q.query.l}
+            onChange={handleChange}
+          />
+          <button onClick={submit}>Submit</button>
+        </div>
+      );
+    }
+  }
 }
 
 function Board(deps: {
@@ -428,6 +494,9 @@ export default function Game() {
 
   return (
     <div className="game">
+      {activeQuestion !== null && (
+        <ActiveQuestionWidget question={activeQuestion}></ActiveQuestionWidget>
+      )}
       <HistoryWidget history={dialogueHistory}></HistoryWidget>
       <Board question={activeQuestion} gameState={gameState}></Board>
       {gameState !== null && <RecipesWidget state={gameState}></RecipesWidget>}
