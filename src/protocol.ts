@@ -21,7 +21,7 @@ export type QuestionContext =
   | "interactWithMarlon.revealDialect.whichRecipe"
   | "interactWithMarlon.revealIngredients.whichRecipe"
   | "interactWithMarlon.giveIngredients.whichRecipe"
-  | "interactWithMerlon.giveIngredients.ingredientsAmounts"
+  | "interactWithMarlon.giveIngredients.ingredientsAmounts"
   | "interactWithMerchant.tradeWhat"
   | "interactWithMerchant.tradeFor"
   | "interactWithSage.translateWhat"

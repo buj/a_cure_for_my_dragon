@@ -21,7 +21,7 @@ export namespace IInput {
   }> {
     const idx = await input.chooseFromRange(prompt, 0, ls.length - 1);
     return {
-      chosen: ls[idx],
+      chosen: ls[idx]!,
       rest: [...ls.slice(0, idx), ...ls.slice(idx + 1)],
     };
   }
@@ -43,7 +43,7 @@ export class RecordedInput<Q> implements IInput<Q> {
     r: number
   ): Promise<number> {
     if (prompt.key in this.recording) {
-      const result = this.recording[prompt.key];
+      const result = this.recording[prompt.key]!;
       if (result < l || result > r) {
         throw new Error("recording does not satisfy input constraints");
       }
@@ -54,7 +54,7 @@ export class RecordedInput<Q> implements IInput<Q> {
 
   public async chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T> {
     const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
-    return ls[idx];
+    return ls[idx]!;
   }
 }
 
@@ -103,7 +103,7 @@ export class ControlledInput<Q> implements IInput<Q> {
 
   public async chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T> {
     const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
-    return ls[idx];
+    return ls[idx]!;
   }
 }
 
@@ -149,7 +149,7 @@ export class Prng<Q> implements IInput<Q> {
 
   public async chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T> {
     const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
-    return ls[idx];
+    return ls[idx]!;
   }
 
   public state(): PrngState {

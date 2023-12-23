@@ -178,9 +178,9 @@ export enum Skill {
 }
 
 export enum Artifact {
-  LeatherBackpack,
-  PortalStone,
-  GoldenDie,
+  LeatherBackpack = "LeatherBackpack",
+  PortalStone = "PortalStone",
+  GoldenDie = "GoldenDie",
 }
 
 export type LostPage = {
@@ -226,7 +226,7 @@ export namespace LostPagesGenerator {
     const shift = await rng.chooseFromRange(prompt, 0, 5);
     const idx = (generator.pos + shift) % generator.wheel.length;
     return {
-      lostPage: generator.wheel[idx],
+      lostPage: generator.wheel[idx]!,
       generator: {
         wheel: [
           ...generator.wheel.slice(0, idx),
@@ -295,7 +295,7 @@ export namespace Village {
     lostPagesGenerator: LostPagesGenerator;
   } | null> {
     const { inventory, village, lostPagesGenerator } = input;
-    const currPage = village.pages.slice(-1)[0];
+    const currPage = village.pages.slice(-1)[0]!;
     if (currPage.purchased) {
       return null;
     }
@@ -529,8 +529,8 @@ export namespace RecipeGenerator {
           dialect: recipe.dialect,
           numPages: recipe.numPages,
           ingredients: {
-            [ingredient1]: count1,
-            [ingredient2]: count2,
+            [ingredient1!]: count1,
+            [ingredient2!]: count2,
           },
           ingredientsCollected: {},
         },
@@ -838,7 +838,7 @@ export class World<T> {
 
   public set(pos: Position, value: T): World<T> {
     const newRows = [...this.rows];
-    newRows[pos.y] = WorldRow.set(newRows[pos.y], pos.x, value);
+    newRows[pos.y] = WorldRow.set(newRows[pos.y]!, pos.x, value);
     return new World(newRows);
   }
 
@@ -954,7 +954,7 @@ export namespace World {
     if (matches.length === 0) {
       return null;
     }
-    return matches[0].cell;
+    return matches[0]!.cell;
   }
 }
 
@@ -1797,7 +1797,7 @@ async function interactWithMarlon(
       for (const ingredientType in recipe.ingredients) {
         const howMuch = await game.player.chooseFromRange(
           {
-            context: "interactWithMerlon.giveIngredients.ingredientsAmounts",
+            context: "interactWithMarlon.giveIngredients.ingredientsAmounts",
             key: JSON.stringify([game.promptNumber, promptSubnumber]),
           },
           0,
