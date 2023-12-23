@@ -752,7 +752,11 @@ export namespace WorldInit {
   }
 
   export function tryFromChar(ch: string): WorldInit {
-    if (ch in WorldInit) {
+    if (
+      Object.values(WorldInit)
+        .map((winit) => winit.toString())
+        .includes(ch)
+    ) {
       return ch as WorldInit;
     } else {
       return WorldInit.Void;

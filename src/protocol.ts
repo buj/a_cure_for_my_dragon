@@ -29,6 +29,32 @@ export type QuestionContext =
   | "chooseAction"
   | { keepOrReroll: RngContext };
 
+export type PositionalQuestionContext =
+  | "caveExit"
+  | "chooseAction"
+  | "portalDestination"
+  | "startGame.honeyBuilding"
+  | "startGame.mushroomBuilding"
+  | "startGame.waterlilyBuilding"
+  | "startGame.startPos";
+
+export function isPositionalQuestion(
+  ctx: QuestionContext
+): ctx is PositionalQuestionContext {
+  switch (ctx) {
+    case "caveExit":
+    case "chooseAction":
+    case "portalDestination":
+    case "startGame.honeyBuilding":
+    case "startGame.mushroomBuilding":
+    case "startGame.waterlilyBuilding":
+    case "startGame.startPos":
+      return true;
+    default:
+      return false;
+  }
+}
+
 export type ShowContext =
   | "caveBarrel.1"
   | "caveBarrel.2"
