@@ -101,13 +101,22 @@ export namespace Inventory {
     const result: Inventory = clone(a);
     result.rubies = Math.min(result.rubies, cap);
     for (const key in result.alchemy) {
-      result.alchemy[key] = Math.min(result.alchemy[key], cap);
+      result.alchemy[key as AlchemicalResource] = Math.min(
+        result.alchemy[key as AlchemicalResource],
+        cap
+      );
     }
     for (const key in result.rawPages) {
-      result.rawPages[key] = Math.min(result.rawPages[key], 4);
+      result.rawPages[key as Dialect] = Math.min(
+        result.rawPages[key as Dialect],
+        4
+      );
     }
     for (const key in result.translatedPages) {
-      result.translatedPages[key] = Math.min(result.translatedPages[key], 4);
+      result.translatedPages[key as Dialect] = Math.min(
+        result.translatedPages[key as Dialect],
+        4
+      );
     }
     return result;
   }
@@ -116,13 +125,15 @@ export namespace Inventory {
     const result: Inventory = clone(a);
     result.rubies += b.rubies ?? 0;
     for (const key in b.alchemy ?? {}) {
-      result.alchemy[key] += b.alchemy![key];
+      result.alchemy[key as AlchemicalResource] +=
+        b.alchemy![key as AlchemicalResource]!;
     }
     for (const key in b.rawPages ?? {}) {
-      result.rawPages[key] += b.rawPages![key];
+      result.rawPages[key as Dialect] += b.rawPages![key as Dialect]!;
     }
     for (const key in b.translatedPages ?? {}) {
-      result.translatedPages[key] += b.translatedPages![key];
+      result.translatedPages[key as Dialect] +=
+        b.translatedPages![key as Dialect]!;
     }
     return result;
   }
@@ -134,20 +145,22 @@ export namespace Inventory {
     const result: Inventory = clone(subtrahend);
     result.rubies -= minuend.rubies ?? 0;
     for (const key in minuend.alchemy ?? {}) {
-      result.alchemy[key] -= minuend.alchemy![key];
-      if (result.alchemy[key] < 0) {
+      result.alchemy[key as AlchemicalResource] -=
+        minuend.alchemy![key as AlchemicalResource]!;
+      if (result.alchemy[key as AlchemicalResource] < 0) {
         return null;
       }
     }
     for (const key in minuend.rawPages ?? {}) {
-      result.rawPages[key] -= minuend.rawPages![key];
-      if (result.rawPages[key] < 0) {
+      result.rawPages[key as Dialect] -= minuend.rawPages![key as Dialect]!;
+      if (result.rawPages[key as Dialect] < 0) {
         return null;
       }
     }
     for (const key in minuend.translatedPages ?? {}) {
-      result.translatedPages[key] -= minuend.translatedPages![key];
-      if (result.translatedPages[key] < 0) {
+      result.translatedPages[key as Dialect] -=
+        minuend.translatedPages![key as Dialect]!;
+      if (result.translatedPages[key as Dialect] < 0) {
         return null;
       }
     }
@@ -360,7 +373,10 @@ export namespace Recipe {
       return false;
     }
     for (const key in recipe.ingredients) {
-      if (recipe.ingredientsCollected[key] ?? 0 < recipe.ingredients[key]) {
+      if (
+        recipe.ingredientsCollected[key as AlchemicalResource] ??
+        0 < recipe.ingredients[key as AlchemicalResource]!
+      ) {
         return false;
       }
     }
@@ -389,12 +405,14 @@ export namespace Recipe {
     };
     for (const key in recipe.ingredients) {
       const ingredientContribution = Math.min(
-        contribution[key] ?? 0,
-        inventory.alchemy[key],
-        recipe.ingredients[key]! - (recipe.ingredientsCollected[key] ?? 0)
+        contribution[key as AlchemicalResource] ?? 0,
+        inventory.alchemy[key as AlchemicalResource],
+        recipe.ingredients[key as AlchemicalResource]! -
+          (recipe.ingredientsCollected[key as AlchemicalResource] ?? 0)
       );
-      newInventory.alchemy[key] -= ingredientContribution;
-      newRecipe.ingredientsCollected[key] += ingredientContribution;
+      newInventory.alchemy[key as AlchemicalResource] -= ingredientContribution;
+      newRecipe.ingredientsCollected[key as AlchemicalResource]! +=
+        ingredientContribution;
     }
     if (isRecipe3WithAllIngredientsCollected(newRecipe)) {
       return {
@@ -1777,15 +1795,17 @@ async function interactWithMarlon(
         Waterlily: 0,
       };
       for (const ingredientType in recipe.ingredients) {
-        const howMuch = game.player.chooseFromRange(
+        const howMuch = await game.player.chooseFromRange(
           {
             context: "interactWithMerlon.giveIngredients.ingredientsAmounts",
             key: JSON.stringify([game.promptNumber, promptSubnumber]),
           },
           0,
-          game.state.character.inventory.alchemy[ingredientType]
+          game.state.character.inventory.alchemy[
+            ingredientType as AlchemicalResource
+          ]
         );
-        contribution[ingredientType] = howMuch;
+        contribution[ingredientType as AlchemicalResource] = howMuch;
         promptSubnumber += 1;
       }
       const result = Recipe.contributeIngredients({
@@ -1816,8 +1836,8 @@ async function interactWithMerchant(
   const choices: Set<Dialect> = new Set();
   for (const d in Dialect) {
     if (
-      game.state.character.inventory.rawPages[d] > 0 ||
-      game.state.character.inventory.translatedPages[d] > 0
+      game.state.character.inventory.rawPages[d as Dialect] > 0 ||
+      game.state.character.inventory.translatedPages[d as Dialect] > 0
     ) {
       choices.add(d as Dialect);
     }

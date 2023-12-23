@@ -75,8 +75,8 @@ function RecipeWidget(deps: { recipe: Recipe }) {
   if ("ingredientsCollected" in recipe) {
     lines = Object.keys(recipe.ingredients).map((key) => {
       const line = `${alchemyStr(key)} : ${progressBarStr(
-        recipe.ingredientsCollected[key],
-        recipe.ingredients[key]
+        recipe.ingredientsCollected[key as AlchemicalResource]!,
+        recipe.ingredients[key as AlchemicalResource]!
       )}`;
       return <div className="recipe.ingredient">{line}</div>;
     });
@@ -147,8 +147,8 @@ type Show = { prompt: Prompt<ShowContext>; what: any };
 
 class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
   public constructor(
-    private setLastQuestion: (q: Question) => void,
-    private setLastShow: (s: Show) => void
+    private setActiveQuestion: (q: Question) => void,
+    private display: (s: Show) => void
   ) {}
 
   public chooseFromRange(
@@ -157,7 +157,7 @@ class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
     r: number
   ): Promise<number> {
     const answer = createDeferred<number>();
-    this.setLastQuestion({
+    this.setActiveQuestion({
       prompt,
       query: {
         type: "chooseFromRange",
@@ -174,7 +174,7 @@ class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
     ls: T[]
   ): Promise<T> {
     const answer = createDeferred<number>();
-    this.setLastQuestion({
+    this.setActiveQuestion({
       prompt,
       query: {
         type: "chooseFromList",
@@ -186,7 +186,7 @@ class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
   }
 
   public show<T>(prompt: Prompt<ShowContext>, value: T) {
-    this.setLastShow({
+    this.display({
       prompt,
       what: value,
     });

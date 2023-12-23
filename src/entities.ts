@@ -32,8 +32,10 @@ export interface IRecorded {
 }
 
 export class RecordedInput<Q> implements IInput<Q> {
-  fallback: IInput<Q>;
-  recording: Record<string, number>;
+  public constructor(
+    private fallback: IInput<Q>,
+    private recording: Record<string, number>
+  ) {}
 
   public chooseFromRange(
     prompt: Prompt<Q>,
@@ -106,7 +108,7 @@ export class ControlledInput<Q> implements IInput<Q> {
 }
 
 export interface IOutput<S> {
-  show<T>(prompt: Prompt<S>, value: T);
+  show<T>(prompt: Prompt<S>, value: T): void;
 }
 
 export interface IPlayer<Q, S> extends IInput<Q>, IOutput<S> {}
