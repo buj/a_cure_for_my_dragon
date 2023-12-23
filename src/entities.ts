@@ -1,19 +1,19 @@
 import seedrandom from "seedrandom";
 
-export type Prompt = {
-  context: string | object;
+export type Prompt<T> = {
+  context: T;
   key: string;
 };
 
-export interface IInput {
-  chooseFromRange(prompt: Prompt, l: number, r: number): Promise<number>;
-  chooseFromList<T>(prompt: Prompt, ls: T[]): Promise<T>;
+export interface IInput<Q> {
+  chooseFromRange(prompt: Prompt<Q>, l: number, r: number): Promise<number>;
+  chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T>;
 }
 
 export namespace IInput {
-  export async function chooseFromListWithoutReplacement<T>(
-    input: IInput,
-    prompt: Prompt,
+  export async function chooseFromListWithoutReplacement<T, Q>(
+    input: IInput<Q>,
+    prompt: Prompt<Q>,
     ls: T[]
   ): Promise<{
     chosen: T;
@@ -31,12 +31,12 @@ export interface IRecorded {
   getHistory(): Record<string, number>;
 }
 
-export class RecordedInput {
-  fallback: IInput;
+export class RecordedInput<Q> implements IInput<Q> {
+  fallback: IInput<Q>;
   recording: Record<string, number>;
 
   public chooseFromRange(
-    prompt: Prompt,
+    prompt: Prompt<Q>,
     l: number,
     r: number
   ): Promise<number> {
@@ -50,23 +50,20 @@ export class RecordedInput {
     return this.fallback.chooseFromRange(prompt, l, r);
   }
 
-  public async chooseFromList<T>(prompt: Prompt, ls: T[]): Promise<T> {
+  public async chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T> {
     const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
     return ls[idx];
   }
 }
 
-export class ControlledInput {
-  source: IInput;
-  controller: IInput;
-
-  public constructor(source: IInput, controller: IInput) {
-    this.source = source;
-    this.controller = controller;
-  }
+export class ControlledInput<Q> implements IInput<Q> {
+  public constructor(
+    private source: IInput<Q>,
+    private controller: IInput<{ keepOrReroll: Q }>
+  ) {}
 
   public async chooseFromRange(
-    prompt: Prompt,
+    prompt: Prompt<Q>,
     l: number,
     r: number
   ): Promise<number> {
@@ -81,8 +78,7 @@ export class ControlledInput {
     const keep = await this.controller.chooseFromList(
       {
         context: {
-          0: "keepOrReroll",
-          1: prompt.context,
+          keepOrReroll: prompt.context,
         },
         key: prompt.key,
       },
@@ -103,23 +99,23 @@ export class ControlledInput {
     }
   }
 
-  public async chooseFromList<T>(prompt: Prompt, ls: T[]): Promise<T> {
+  public async chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T> {
     const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
     return ls[idx];
   }
 }
 
-export interface IOutput {
-  show<T>(prompt: Prompt, value: T);
+export interface IOutput<S> {
+  show<T>(prompt: Prompt<S>, value: T);
 }
 
-export interface IPlayer extends IInput, IOutput {}
+export interface IPlayer<Q, S> extends IInput<Q>, IOutput<S> {}
 
 export class PrngState {
   constructor(public state: any) {}
 }
 
-export class Prng {
+export class Prng<Q> implements IInput<Q> {
   rng: any;
   history: Record<string, number>;
 
@@ -137,7 +133,7 @@ export class Prng {
   }
 
   public chooseFromRange(
-    prompt: Prompt,
+    prompt: Prompt<Q>,
     l: number,
     r: number
   ): Promise<number> {
@@ -149,7 +145,7 @@ export class Prng {
     return Promise.resolve(result);
   }
 
-  public async chooseFromList<T>(prompt: Prompt, ls: T[]): Promise<T> {
+  public async chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T> {
     const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
     return ls[idx];
   }

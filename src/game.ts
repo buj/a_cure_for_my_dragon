@@ -1,4 +1,5 @@
 import { ControlledInput, IInput, IPlayer, Prng, Prompt } from "./entities";
+import { QuestionContext, RngContext, ShowContext } from "./protocol";
 import { evalThunk } from "./utils";
 
 export enum AlchemicalResource {
@@ -205,8 +206,8 @@ export namespace LostPagesGenerator {
   }
 
   export async function generate(
-    prompt: Prompt,
-    rng: IInput,
+    prompt: Prompt<RngContext>,
+    rng: IInput<RngContext>,
     generator: LostPagesGenerator
   ): Promise<{ lostPage: LostPage; generator: LostPagesGenerator }> {
     const shift = await rng.chooseFromRange(prompt, 0, 5);
@@ -240,8 +241,8 @@ export namespace Village {
   }
 
   export async function revealFirstPage(
-    prompt: Prompt,
-    rng: IInput,
+    prompt: Prompt<RngContext>,
+    rng: IInput<RngContext>,
     input: { village: Village; lostPagesGenerator: LostPagesGenerator }
   ): Promise<{
     village: Village;
@@ -268,8 +269,8 @@ export namespace Village {
   }
 
   export async function purchasePage(
-    prompt: Prompt,
-    rng: IInput,
+    prompt: Prompt<RngContext>,
+    rng: IInput<RngContext>,
     input: {
       inventory: Inventory;
       village: Village;
@@ -440,7 +441,7 @@ export namespace RecipeGenerator {
 
   export async function generate(
     promptKey: string,
-    rng: IInput,
+    rng: IInput<RngContext>,
     input: {
       recipeGenerator: RecipeGenerator;
       recipe: Recipe;
@@ -451,13 +452,14 @@ export namespace RecipeGenerator {
   } | null> {
     const { recipeGenerator, recipe } = input;
     if (recipe.dialect === null) {
+      const ctx: Prompt<RngContext> = {
+        context: "RecipeGenerator.generate.dialect",
+        key: promptKey,
+      };
       const { chosen: dialect, rest: remainingDialects } =
         await IInput.chooseFromListWithoutReplacement(
           rng,
-          {
-            context: "RecipeGenerator.generate.dialect",
-            key: promptKey,
-          },
+          ctx,
           recipeGenerator.remainingDialects
         );
       return {
@@ -1117,14 +1119,14 @@ export namespace GameState {
 
 export class BootstrappedGame {
   state: GameState;
-  sourceRng: Prng;
-  player: IPlayer;
+  sourceRng: Prng<RngContext>;
+  player: IPlayer<QuestionContext, ShowContext>;
   promptNumber: number;
 
   public constructor(init: {
     state: GameState;
-    sourceRng: Prng;
-    player: IPlayer;
+    sourceRng: Prng<RngContext>;
+    player: IPlayer<QuestionContext, ShowContext>;
     promptNumber: number;
   }) {
     this.state = init.state;
@@ -1133,7 +1135,7 @@ export class BootstrappedGame {
     this.player = init.player;
   }
 
-  public rng(): IInput {
+  public rng(): IInput<RngContext> {
     if (this.state.character.artifacts.includes(Artifact.GoldenDie)) {
       return new ControlledInput(this.sourceRng, this.player);
     } else {
@@ -1155,8 +1157,8 @@ export class BootstrappedGame {
 
 export namespace BootstrappedGame {
   export async function createInitial(
-    sourceRng: Prng,
-    player: IPlayer
+    sourceRng: Prng<RngContext>,
+    player: IPlayer<QuestionContext, ShowContext>
   ): Promise<BootstrappedGame> {
     const worldInit = World.init(defaultWorld);
     const startPos = await player.chooseFromList(
@@ -1277,7 +1279,10 @@ function moveAction(
   return game.withState(newState);
 }
 
-function caveBarrel(prompt: Prompt, rng: IInput): Promise<InventoryOpt> {
+function caveBarrel(
+  prompt: Prompt<RngContext>,
+  rng: IInput<RngContext>
+): Promise<InventoryOpt> {
   const options: InventoryOpt[] = [
     {
       rubies: 2,
@@ -1320,10 +1325,10 @@ async function enterCave(
 
   // barrel1
 
-  const ctx1: Prompt = {
+  const ctx1 = {
     context: "caveBarrel.1",
     key: JSON.stringify([game.promptNumber, 0]),
-  };
+  } as const;
   const gain1 = await caveBarrel(ctx1, game.rng());
   game.player.show(ctx1, gain1);
   const state1 = {
@@ -1348,10 +1353,10 @@ async function enterCave(
   var state2: GameState;
   switch (whichWay) {
     case "barrel": {
-      const ctx2: Prompt = {
+      const ctx2 = {
         context: "caveBarrel.2",
         key: JSON.stringify([game.promptNumber, 2]),
-      };
+      } as const;
       const gain2 = await caveBarrel(ctx2, game.rng());
       game.player.show(ctx2, gain2);
       state2 = {
@@ -1361,10 +1366,10 @@ async function enterCave(
       break;
     }
     case "treasure": {
-      const ctx2: Prompt = {
+      const ctx2 = {
         context: "caveTreasure",
         key: JSON.stringify([game.promptNumber, 2]),
-      };
+      } as const;
       const cands = [
         Artifact.GoldenDie,
         Artifact.LeatherBackpack,
@@ -1534,7 +1539,7 @@ async function interactWithVillage(
   } else {
     const afterPurchase = await Village.purchasePage(
       {
-        context: "interactWithVillage.purchasePage",
+        context: "interactWithVillage.afterPurchasePageReveal",
         key: JSON.stringify(game.promptNumber),
       },
       game.rng(),
@@ -1586,10 +1591,10 @@ async function interactWithMarket(
       MarketTradeType.GoodsForRuby,
     ]
   );
-  const prompt2: Prompt = {
+  const prompt2 = {
     context: "interactWithMarket.trade",
     key: JSON.stringify([game.promptNumber, 1]),
-  };
+  } as const;
 
   var lhs: InventoryOpt;
   var rhs: InventoryOpt;
@@ -1969,7 +1974,10 @@ async function takeAction(
   return afterAction.advancePromptNumber();
 }
 
-export async function runGame(sourceRng: Prng, player: IPlayer) {
+export async function runGame(
+  sourceRng: Prng<RngContext>,
+  player: IPlayer<QuestionContext, ShowContext>
+) {
   var game = await BootstrappedGame.createInitial(sourceRng, player);
   while (true) {
     player.show(

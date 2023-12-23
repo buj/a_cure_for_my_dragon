@@ -9,7 +9,11 @@ import {
   Recipe3,
   GameState,
   RecipeGenerator,
+  runGame,
 } from "./game";
+import { IPlayer, Prng, Prompt } from "./entities";
+import { Deferred, createDeferred } from "./utils";
+import { QuestionContext, ShowContext } from "./protocol";
 
 function dialectStr(d: string): string {
   switch (d) {
@@ -49,8 +53,8 @@ function progressBarStr(numerator: number, denominator: number): string {
   return `${fulfilledStr}${remainingStr}`;
 }
 
-function RecipeWidget(inputs: { recipe: Recipe }) {
-  const { recipe } = inputs;
+function RecipeWidget(deps: { recipe: Recipe }) {
+  const { recipe } = deps;
   if (recipe.dialect === null) {
     const costStr = Array(recipe.rubiesCost).fill("💎").flat().join();
     const numPagesStr = `[?]⨉${recipe.numPages}`;
@@ -86,8 +90,8 @@ function RecipeWidget(inputs: { recipe: Recipe }) {
   return <div className="recipe">{lines}</div>;
 }
 
-function RecipeGeneratorWidget(input: { recipeGenerator: RecipeGenerator }) {
-  const { recipeGenerator } = input;
+function RecipeGeneratorWidget(deps: { recipeGenerator: RecipeGenerator }) {
+  const { recipeGenerator } = deps;
   const remainingDialectsStr = recipeGenerator.remainingDialects
     .map(dialectStr)
     .join(", ");
@@ -109,8 +113,8 @@ function RecipeGeneratorWidget(input: { recipeGenerator: RecipeGenerator }) {
   );
 }
 
-function RecipesWidget(input: { state: GameState }) {
-  const { state } = input;
+function RecipesWidget(deps: { state: GameState }) {
+  const { state } = deps;
   const recipesWidgets = state.recipes.map((recipe) =>
     RecipeWidget({ recipe })
   );
@@ -124,9 +128,78 @@ function RecipesWidget(input: { state: GameState }) {
   );
 }
 
-// world: World<Cell>,
-// callbacks: { onHexClick: (pos: { x: number; y: number }) => void }
-function Board() {
+type Question = {
+  prompt: Prompt<QuestionContext>;
+  query:
+    | {
+        type: "chooseFromRange";
+        l: number;
+        r: number;
+      }
+    | {
+        type: "chooseFromList";
+        ls: any[];
+      };
+  answer: Deferred<number>;
+};
+
+type Show = { prompt: Prompt<ShowContext>; what: any };
+
+class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
+  public constructor(
+    private setLastQuestion: (q: Question) => void,
+    private setLastShow: (s: Show) => void
+  ) {}
+
+  public chooseFromRange(
+    prompt: Prompt<QuestionContext>,
+    l: number,
+    r: number
+  ): Promise<number> {
+    const answer = createDeferred<number>();
+    this.setLastQuestion({
+      prompt,
+      query: {
+        type: "chooseFromRange",
+        l,
+        r,
+      },
+      answer,
+    });
+    return answer.promise;
+  }
+
+  public async chooseFromList<T>(
+    prompt: Prompt<QuestionContext>,
+    ls: T[]
+  ): Promise<T> {
+    const answer = createDeferred<number>();
+    this.setLastQuestion({
+      prompt,
+      query: {
+        type: "chooseFromList",
+        ls,
+      },
+      answer,
+    });
+    return ls[await answer.promise];
+  }
+
+  public show<T>(prompt: Prompt<ShowContext>, value: T) {
+    this.setLastShow({
+      prompt,
+      what: value,
+    });
+  }
+}
+
+function PromptWidget(deps: { question: Question | null; info: Show | null }) {}
+
+function Board(deps: {
+  question: Question | null;
+  gameState: GameState | null;
+}) {
+  const { question, gameState } = deps;
   return (
     <svg width="80%" viewBox="0 0 2970 2100">
       <image href="board.svg" width="100%" height="100%" />
@@ -135,9 +208,27 @@ function Board() {
 }
 
 export default function Game() {
+  const [question, setQuestion] = React.useState<Question | null>(null);
+  const [info, setInfo] = React.useState<Show | null>(null);
+  const [gameState, setGameState] = React.useState<GameState | null>(null);
+
+  React.useEffect(() => {
+    const setShow = (s: Show) => {
+      if (s.prompt.context === "gameState") {
+        setGameState(s.what);
+      } else {
+        setInfo(s);
+      }
+    };
+    const player = new UIPlayer(setQuestion, setShow);
+    const prng = new Prng("164012421");
+    runGame(prng, player);
+  }, [setQuestion, setInfo, setGameState]);
+
   return (
     <div>
-      <Board></Board>
+      <Board question={question} gameState={gameState}></Board>
+      {gameState !== null && <RecipesWidget state={gameState}></RecipesWidget>}
     </div>
   );
 }
