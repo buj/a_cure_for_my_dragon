@@ -1793,6 +1793,11 @@ async function interactWithMarlon(
           }
         }
       );
+      if (choices.length === 0) {
+        return left({
+          msg: "there are no recipes with unknown dialects",
+        });
+      }
       const [idx, recipe] = await game.player.chooseFromList(
         {
           context: "interactWithMarlon.revealDialect.whichRecipe",
