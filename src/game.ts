@@ -1486,6 +1486,11 @@ function buildProductionBuilding(
   cell: Cell,
   game: BootstrappedGame
 ): BootstrappedGame | null {
+  const newCharacterState = game.state.character.tradeItems({ rubies: 1 }, {});
+  if (newCharacterState === null) {
+    return null;
+  }
+
   var produce: AlchemicalResource;
   switch (cell.terrain) {
     case WorldTerrainType.Mountain: {
@@ -1516,6 +1521,7 @@ function buildProductionBuilding(
   return game.withState({
     ...game.state,
     world: newWorld,
+    character: newCharacterState,
   });
 }
 
