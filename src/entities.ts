@@ -1,4 +1,5 @@
 import seedrandom from "seedrandom";
+import { evalThunk } from "./utils";
 
 export type Prompt<T> = {
   context: T;
@@ -118,7 +119,7 @@ export class PrngState {
 }
 
 export class Prng<Q> implements IInput<Q> {
-  rng: any;
+  rng: seedrandom.StatefulPRNG<seedrandom.State.Arc4>;
   history: Record<string, number>;
 
   public constructor(seed: string | PrngState) {
@@ -142,7 +143,16 @@ export class Prng<Q> implements IInput<Q> {
     if (r < l) {
       throw new Error("random choice from empty range");
     }
-    const result = l + (this.rng.int32() % (r - l + 1));
+    const modulus = r - l + 1;
+    const roll = evalThunk(() => {
+      const tmp = this.rng.int32() % modulus;
+      if (tmp < 0) {
+        return modulus + tmp;
+      } else {
+        return tmp;
+      }
+    });
+    const result = l + roll;
     this.history[prompt.key] = result;
     return Promise.resolve(result);
   };
