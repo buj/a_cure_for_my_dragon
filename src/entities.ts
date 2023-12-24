@@ -64,11 +64,11 @@ export class ControlledInput<Q> implements IInput<Q> {
     private controller: IInput<{ keepOrReroll: Q }>
   ) {}
 
-  public async chooseFromRange(
+  public chooseFromRange = async (
     prompt: Prompt<Q>,
     l: number,
     r: number
-  ): Promise<number> {
+  ): Promise<number> => {
     const srcChoice = this.source.chooseFromRange(
       {
         context: prompt.context,
@@ -99,12 +99,12 @@ export class ControlledInput<Q> implements IInput<Q> {
         r
       );
     }
-  }
+  };
 
-  public async chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T> {
+  public chooseFromList = async <T>(prompt: Prompt<Q>, ls: T[]): Promise<T> => {
     const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
     return ls[idx]!;
-  }
+  };
 }
 
 export interface IOutput<S> {
@@ -130,29 +130,29 @@ export class Prng<Q> implements IInput<Q> {
     this.history = {};
   }
 
-  public getHistory(): Record<string, number> {
+  public getHistory = (): Record<string, number> => {
     return this.history;
-  }
+  };
 
-  public chooseFromRange(
+  public chooseFromRange = (
     prompt: Prompt<Q>,
     l: number,
     r: number
-  ): Promise<number> {
+  ): Promise<number> => {
     if (r < l) {
       throw new Error("random choice from empty range");
     }
     const result = l + (this.rng.int32() % (r - l + 1));
     this.history[prompt.key] = result;
     return Promise.resolve(result);
-  }
+  };
 
-  public async chooseFromList<T>(prompt: Prompt<Q>, ls: T[]): Promise<T> {
+  public chooseFromList = async <T>(prompt: Prompt<Q>, ls: T[]): Promise<T> => {
     const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
     return ls[idx]!;
-  }
+  };
 
-  public state(): PrngState {
+  public state = (): PrngState => {
     return new PrngState(this.rng.state());
-  }
+  };
 }

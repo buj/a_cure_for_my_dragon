@@ -14,6 +14,7 @@ import {
   Position,
   GameAction,
   GameActionType,
+  WorldObjectType,
 } from "./game";
 import { IPlayer, Prng, Prompt } from "./entities";
 import { Deferred, PromiseState, createDeferred, evalThunk } from "./utils";
@@ -186,11 +187,11 @@ class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
     private display: (s: Show) => void
   ) {}
 
-  public chooseFromRange(
+  public chooseFromRange = (
     prompt: Prompt<QuestionContext>,
     l: number,
     r: number
-  ): Promise<number> {
+  ): Promise<number> => {
     const answer = createDeferred<number>();
     this.setActiveQuestion({
       prompt,
@@ -202,12 +203,12 @@ class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
       answer,
     });
     return answer.promise;
-  }
+  };
 
-  public async chooseFromList<T>(
+  public chooseFromList: <T>(
     prompt: Prompt<QuestionContext>,
     ls: T[]
-  ): Promise<T> {
+  ) => Promise<T> = async (prompt, ls) => {
     const answer = createDeferred<number>();
     this.setActiveQuestion({
       prompt,
@@ -218,14 +219,17 @@ class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
       answer,
     });
     return ls[await answer.promise]!;
-  }
+  };
 
-  public show<T>(prompt: Prompt<ShowContext>, value: T) {
+  public show: <T>(prompt: Prompt<ShowContext>, value: T) => void = (
+    prompt,
+    value
+  ) => {
     this.display({
       prompt,
       what: value,
     });
-  }
+  };
 }
 
 type DialogueEntry =
@@ -251,7 +255,7 @@ class DialogueHistory {
   ) {}
 
   // return this if no cutoff (i.e. `d` is not in history)
-  cutOffBeyond(d: DialogueEntry): DialogueHistory | null {
+  cutOffBeyond = (d: DialogueEntry): DialogueHistory | null => {
     const ord = this.mapToOrd[DialogueEntry.deriveKey(d)];
     if (ord === undefined) {
       return null;
@@ -261,9 +265,9 @@ class DialogueHistory {
       Object.entries(this.mapToOrd).filter(([_, value]) => value <= ord)
     );
     return new DialogueHistory(newHistory, newMapToOrd);
-  }
+  };
 
-  public add(d: DialogueEntry): DialogueHistory {
+  public add = (d: DialogueEntry): DialogueHistory => {
     const afterCutoff = this.cutOffBeyond(d);
     if (afterCutoff !== null) {
       return afterCutoff;
@@ -274,11 +278,11 @@ class DialogueHistory {
       [DialogueEntry.deriveKey(d)]: this.history.length,
     };
     return new DialogueHistory(newHistory, newMapToOrd);
-  }
+  };
 
-  public getHistory(): Array<DialogueEntry> {
+  public getHistory = (): Array<DialogueEntry> => {
     return this.history;
-  }
+  };
 }
 
 function translateQuestionContext(q: QuestionContext): string {
@@ -451,21 +455,21 @@ function ActiveQuestionWidget(deps: { question: Question }) {
 class Vector2d {
   public constructor(public x: number, public y: number) {}
 
-  public add(other: Vector2d): Vector2d {
+  public add = (other: Vector2d): Vector2d => {
     return new Vector2d(this.x + other.x, this.y + other.y);
-  }
+  };
 
-  public sub(other: Vector2d): Vector2d {
+  public sub = (other: Vector2d): Vector2d => {
     return new Vector2d(this.x - other.x, this.y - other.y);
-  }
+  };
 
-  public mul(k: number): Vector2d {
+  public mul = (k: number): Vector2d => {
     return new Vector2d(this.x * k, this.y * k);
-  }
+  };
 
-  public div(k: number): Vector2d {
+  public div = (k: number): Vector2d => {
     return new Vector2d(this.x / k, this.y / k);
-  }
+  };
 }
 
 namespace BoardImpl {
@@ -499,6 +503,48 @@ namespace BoardImpl {
     return new Vector2d(transformedPoint.x, transformedPoint.y);
   }
 
+  export function worldElements(state: GameState) {
+    return state.world.listHexes().flatMap(({ pos, value: cell }) => {
+      if (cell.object === undefined) {
+        return [];
+      }
+      const centerPixel = getCenterPixelForPos(pos);
+      switch (cell.object.type) {
+        case WorldObjectType.PreviouslyVisited: {
+          const opacity =
+            cell.object.data.turnNumber === state.turnNumber ? 1 : 0.5;
+          return [
+            <text
+              x={centerPixel.x}
+              y={centerPixel.y}
+              dx={-hexRadius / 3}
+              dy={hexRadius / 3}
+              opacity={opacity}
+              fontSize={hexRadius}
+            >
+              {cell.object.data.turnNumber}
+            </text>,
+          ];
+        }
+        case WorldObjectType.ProductionBuilding: {
+          const repr = alchemyStr(cell.object.data.produces);
+          return [
+            <text
+              x={centerPixel.x}
+              y={centerPixel.y}
+              dx={-hexRadius / 2}
+              dy={hexRadius / 3}
+              fontSize={hexRadius}
+            >
+              {repr}
+            </text>,
+          ];
+        }
+      }
+      return [];
+    });
+  }
+
   export function onClick(
     q: Question,
     event: React.MouseEvent<SVGSVGElement>,
@@ -515,9 +561,9 @@ namespace BoardImpl {
     if (q.prompt.context === "chooseAction") {
       const actionType = evalThunk(() => {
         switch (event.button) {
-          case 0:
+          case 1:
             return GameActionType.Interact;
-          case 2:
+          case 0:
             return GameActionType.Move;
           default:
             return null;
@@ -636,6 +682,7 @@ function Board(deps: {
         stroke-width="3"
         stroke="#008800"
       />
+      {gameState && BoardImpl.worldElements(gameState)}
     </svg>
   );
 }

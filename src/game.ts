@@ -770,12 +770,12 @@ export namespace Position {
   export function getAdjacents(pos: Position): Position[] {
     const { x, y } = pos;
     return [
-      { y: y + 1, x: x - 1 },
-      { y: y + 1, x: x },
-      { y: y, x: x + 1 },
-      { y: y - 1, x: x + 1 },
-      { y: y - 1, x: x },
-      { y: y, x: x - 1 },
+      { y: y + 1, x },
+      { y, x: x - 1 },
+      { y: y - 1, x: x - 1 },
+      { y: y - 1, x },
+      { y, x: x + 1 },
+      { y: y + 1, x: x + 1 },
     ];
   }
 
@@ -816,7 +816,7 @@ export namespace WorldRow {
 export class World<T> {
   public constructor(public rows: WorldRow<T>[]) {}
 
-  public listHexes(): Array<{ pos: Position; value: T }> {
+  public listHexes = (): Array<{ pos: Position; value: T }> => {
     const result: Array<{ pos: Position; value: T }> = [];
     for (const [y, row] of this.rows.entries()) {
       for (const [x, value] of row.right.entries()) {
@@ -827,9 +827,9 @@ export class World<T> {
       }
     }
     return result;
-  }
+  };
 
-  public map<Y>(f: (x: T) => Y): World<Y> {
+  public map = <Y>(f: (x: T) => Y): World<Y> => {
     const rowsMapped: WorldRow<Y>[] = this.rows.map((row) => {
       const { leftReversed, right } = row;
       return {
@@ -838,19 +838,19 @@ export class World<T> {
       };
     });
     return new World(rowsMapped);
-  }
+  };
 
-  public set(pos: Position, value: T): World<T> {
+  public set = (pos: Position, value: T): World<T> => {
     const newRows = [...this.rows];
     newRows[pos.y] = WorldRow.set(newRows[pos.y]!, pos.x, value);
     return new World(newRows);
-  }
+  };
 
-  getRow(rowNumber: number): WorldRow<T> | null {
+  getRow = (rowNumber: number): WorldRow<T> | null => {
     return this.rows[rowNumber] ?? null;
-  }
+  };
 
-  public get(pos: Position): T | null {
+  public get = (pos: Position): T | null => {
     const { x, y } = pos;
     const row = this.getRow(y);
     if (row === null) {
@@ -861,9 +861,9 @@ export class World<T> {
     } else {
       return row.leftReversed[-x - 1] ?? null;
     }
-  }
+  };
 
-  public getAdjacents(pos: Position): Array<{ pos: Position; value: T }> {
+  public getAdjacents = (pos: Position): Array<{ pos: Position; value: T }> => {
     const adjacentPositions = Position.getAdjacents(pos);
     return adjacentPositions.flatMap((adj) => {
       const adjValue = this.get(adj);
@@ -873,13 +873,13 @@ export class World<T> {
         return [{ pos: adj, value: adjValue }];
       }
     });
-  }
+  };
 
-  public bfs(
+  public bfs = (
     start: Position,
     limit: number,
     passable: (value: T) => boolean
-  ): Array<{ pos: Position; value: T }> {
+  ): Array<{ pos: Position; value: T }> => {
     const startValue = this.get(start);
     if (startValue === null) {
       throw new Error("invalid starting position");
@@ -888,20 +888,23 @@ export class World<T> {
     const queue: Array<{ pos: Position; value: T; distance: number }> = [
       { pos: start, value: startValue, distance: 0 },
     ];
+    var queueStart = 0;
     const result: Array<{ pos: Position; value: T }> = [];
 
-    while (queue.length > 0) {
-      const { pos, value, distance } = queue.pop()!;
+    while (queueStart < queue.length) {
+      const { pos, value, distance } = queue[queueStart]!;
+      queueStart += 1;
+
+      const key = JSON.stringify([pos.x, pos.y]);
+      if (visited.has(key)) {
+        continue;
+      }
+      visited.add(key);
       result.push({ pos, value });
 
       if (distance >= limit) {
         continue;
       }
-      const key = JSON.stringify(pos);
-      if (key in visited) {
-        continue;
-      }
-      visited.add(key);
 
       const adjacents = this.getAdjacents(pos);
       for (const adj of adjacents) {
@@ -915,7 +918,7 @@ export class World<T> {
       }
     }
     return result;
-  }
+  };
 }
 
 export namespace World {
@@ -973,7 +976,7 @@ export class Character {
   public skills: Skill[];
   public artifacts: Artifact[];
 
-  constructor(init?: CharacterState) {
+  public constructor(init?: CharacterState) {
     if (init === undefined) {
       this.inventory = Inventory.createInitial();
       this.skills = [];
@@ -985,46 +988,46 @@ export class Character {
     }
   }
 
-  public withInventory(inventory: Inventory): Character {
-    return {
+  public withInventory = (inventory: Inventory): Character => {
+    return new Character({
       ...this,
       inventory,
-    };
-  }
+    });
+  };
 
-  public withSkill(skill: Skill): Character {
+  public withSkill = (skill: Skill): Character => {
     if (this.skills.includes(skill)) {
       return this;
     }
-    return {
+    return new Character({
       ...this,
       skills: [...this.skills, skill],
-    };
-  }
+    });
+  };
 
-  public withArtifact(artifact: Artifact): Character {
+  public withArtifact = (artifact: Artifact): Character => {
     if (this.artifacts.includes(artifact)) {
       return this;
     }
-    return {
+    return new Character({
       ...this,
       artifacts: [...this.artifacts, artifact],
-    };
-  }
+    });
+  };
 
-  public storageCapacity(): number {
+  public storageCapacity = (): number => {
     return (
       2 +
       (this.skills.includes(Skill.HeftyPockets) ? 1 : 0) +
       (this.artifacts.includes(Artifact.LeatherBackpack) ? 1 : 0)
     );
-  }
+  };
 
-  public movementSpeed(): number {
+  public movementSpeed = (): number => {
     return 2 + (this.skills.includes(Skill.SwiftBoots) ? 1 : 0);
-  }
+  };
 
-  public canTraverse(cell: Cell): boolean {
+  public canTraverse = (cell: Cell): boolean => {
     if (cell.object !== undefined) {
       return cell.object.type === WorldObjectType.PreviouslyVisited;
     }
@@ -1039,20 +1042,23 @@ export class Character {
       case WorldTerrainType.Void:
         return false;
     }
-  }
+  };
 
-  public gainItems(items: InventoryOpt): Character {
+  public gainItems = (items: InventoryOpt): Character => {
     const newInventory = Inventory.limit(
       Inventory.add(this.inventory, items),
       this.storageCapacity()
     );
-    return {
+    return new Character({
       ...this,
       inventory: newInventory,
-    };
-  }
+    });
+  };
 
-  public tradeItems(cost: InventoryOpt, gain: InventoryOpt): Character | null {
+  public tradeItems = (
+    cost: InventoryOpt,
+    gain: InventoryOpt
+  ): Character | null => {
     const afterCost = Inventory.subtract(this.inventory, cost);
     if (afterCost === null) {
       return null;
@@ -1065,7 +1071,7 @@ export class Character {
       ...this,
       inventory: newInventory,
     };
-  }
+  };
 }
 
 export type GameState = {
@@ -1157,24 +1163,24 @@ export class BootstrappedGame {
     this.player = init.player;
   }
 
-  public rng(): IInput<RngContext> {
+  public rng = (): IInput<RngContext> => {
     if (this.state.character.artifacts.includes(Artifact.GoldenDie)) {
       return new ControlledInput(this.sourceRng, this.player);
     } else {
       return this.sourceRng;
     }
-  }
+  };
 
-  public withState(newState: GameState): BootstrappedGame {
+  public withState = (newState: GameState): BootstrappedGame => {
     return new BootstrappedGame({ ...this, state: newState });
-  }
+  };
 
-  public advancePromptNumber(): BootstrappedGame {
+  public advancePromptNumber = (): BootstrappedGame => {
     return new BootstrappedGame({
       ...this,
       promptNumber: this.promptNumber + 1,
     });
-  }
+  };
 }
 
 export namespace BootstrappedGame {
@@ -1240,22 +1246,29 @@ export namespace BootstrappedGame {
       state: {
         ...initialState,
         world: initialState.world
+          .set(startPos, {
+            ...initialState.world.get(startPos)!,
+            object: {
+              type: WorldObjectType.PreviouslyVisited,
+              data: { turnNumber: 0 },
+            },
+          })
           .set(whereHoney, {
-            terrain: WorldTerrainType.Mountain,
+            ...initialState.world.get(whereHoney)!,
             object: {
               type: WorldObjectType.ProductionBuilding,
               data: { produces: AlchemicalResource.Honey },
             },
           })
           .set(whereMushroom, {
-            terrain: WorldTerrainType.Forest,
+            ...initialState.world.get(whereMushroom)!,
             object: {
               type: WorldObjectType.ProductionBuilding,
               data: { produces: AlchemicalResource.Mushroom },
             },
           })
           .set(whereWaterlily, {
-            terrain: WorldTerrainType.Lake,
+            ...initialState.world.get(whereWaterlily)!,
             object: {
               type: WorldObjectType.ProductionBuilding,
               data: { produces: AlchemicalResource.Waterlily },

@@ -44,7 +44,7 @@ class DeferredImpl<T> implements Deferred<T> {
     this.reasonIfRejected = null;
   }
 
-  public getSync(): PromiseSync<T> {
+  public getSync = (): PromiseSync<T> => {
     if (this.valueIfResolved !== null) {
       return {
         state: PromiseState.Resolved,
@@ -60,17 +60,17 @@ class DeferredImpl<T> implements Deferred<T> {
     return {
       state: PromiseState.Pending,
     };
-  }
+  };
 
-  public resolve(value: T): void {
+  public resolve = (value: T): void => {
     this.valueIfResolved = value;
     this.resolvePromise(value);
-  }
+  };
 
-  public reject(reason?: any): void {
+  public reject = (reason?: any): void => {
     this.reasonIfRejected = { reason };
     this.rejectPromise(reason);
-  }
+  };
 }
 
 export function createDeferred<T>(): Deferred<T> {
