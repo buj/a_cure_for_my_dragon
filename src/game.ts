@@ -145,6 +145,9 @@ export namespace Inventory {
   ): Inventory | null {
     const result: Inventory = clone(subtrahend);
     result.rubies -= minuend.rubies ?? 0;
+    if (result.rubies < 0) {
+      return null;
+    }
     for (const key in minuend.alchemy ?? {}) {
       result.alchemy[key as AlchemicalResource] -=
         minuend.alchemy![key as AlchemicalResource]!;
@@ -1086,10 +1089,12 @@ export class Character {
       Inventory.add(afterCost, gain),
       this.storageCapacity()
     );
-    return right({
-      ...this,
-      inventory: newInventory,
-    });
+    return right(
+      new Character({
+        ...this,
+        inventory: newInventory,
+      })
+    );
   };
 }
 
@@ -1593,7 +1598,9 @@ function interactWithProductionBuilding(
   game: BootstrappedGame
 ): GameActionResult<BootstrappedGame> {
   const newCharacterState = game.state.character.gainItems({
-    [produce]: 10,
+    alchemy: {
+      [produce]: 10,
+    },
   });
   return right(
     game.withState({
