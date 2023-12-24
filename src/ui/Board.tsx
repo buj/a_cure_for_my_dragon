@@ -119,9 +119,9 @@ namespace BoardImpl {
                 x={x}
                 y={centerPixel.y - hexRadius / 3}
                 fontSize={hexRadius * 0.55}
-                className={
-                  page.purchased ? "purchasedVillagePage" : "villagePageForSale"
-                }
+                className={["villagePage"]
+                  .concat(page.purchased ? ["purchased"] : [])
+                  .join(" ")}
                 textAnchor="middle"
                 dominantBaseline="middle"
               >

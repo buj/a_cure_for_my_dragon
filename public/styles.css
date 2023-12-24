@@ -1,0 +1,8 @@
+.lostPagesGeneratorPage:not(.current) {
+    opacity: 0.5;
+}
+
+.villagePage.purchased {
+    opacity: 0.5;
+    text-decoration: line-through;
+}

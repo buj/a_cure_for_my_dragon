@@ -5,10 +5,9 @@ import { alchemyStr, dialectStr } from "./utils";
 function LostPageWidget(page: LostPage, current: boolean) {
   return (
     <div
-      key={JSON.stringify([page.cost, page.dialect])}
-      className={
-        current ? "lostPagesGeneratorCurrentPage" : "lostPagesGeneratorPage"
-      }
+      className={["lostPagesGeneratorPage"]
+        .concat(current ? ["current"] : [])
+        .join(" ")}
     >
       [{alchemyStr(page.cost)}→{dialectStr(page.dialect)}]
     </div>
