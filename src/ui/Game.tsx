@@ -1,13 +1,57 @@
 import React from "react";
-import { GameActionError, GameState, runGame } from "../game";
+import {
+  AlchemicalResource,
+  Dialect,
+  GameActionError,
+  GameState,
+  Inventory,
+  runGame,
+} from "../game";
 import { Question, Show, UIPlayer } from "./player";
 import HistoryWidget, { DialogueHistory } from "./HistoryWidget";
 import { Prng } from "../entities";
 import Board from "./Board";
 import RecipesWidget from "./RecipesWidget";
+import { alchemyStr, dialectStr, progressBarStr, unaryStr } from "./utils";
 
 function ErrorPrompt(deps: { error: GameActionError }) {
   return <div className="errorPrompt">{JSON.stringify(deps.error)}</div>;
+}
+
+function InventoryWidget(deps: { inventory: Inventory }) {
+  const { inventory } = deps;
+  const elems: React.JSX.Element[] = [];
+  if (inventory.rubies > 0) {
+    elems.push(<div>💎: {unaryStr(inventory.rubies)}</div>);
+  }
+  for (const a in AlchemicalResource) {
+    const count = inventory.alchemy[a as AlchemicalResource];
+    if (count > 0) {
+      elems.push(
+        <div>
+          {alchemyStr(a)}: {unaryStr(count)}
+        </div>
+      );
+    }
+  }
+  for (const d in Dialect) {
+    const rawCount = inventory.rawPages[d as Dialect];
+    const translatedCount = inventory.translatedPages[d as Dialect];
+    if (rawCount + translatedCount > 0) {
+      elems.push(
+        <div>
+          {dialectStr(d)}:{" "}
+          {progressBarStr(translatedCount, translatedCount + rawCount)}
+        </div>
+      );
+    }
+  }
+  return (
+    <div className="inventory">
+      <h4>Inventory</h4>
+      {elems}
+    </div>
+  );
 }
 
 export default function Game() {
@@ -55,10 +99,13 @@ export default function Game() {
 
   return (
     <div className="game">
-      {latestError && <ErrorPrompt error={latestError}></ErrorPrompt>}
-      <HistoryWidget history={dialogueHistory}></HistoryWidget>
-      <Board question={activeQuestion} gameState={gameState}></Board>
-      {gameState !== null && <RecipesWidget state={gameState}></RecipesWidget>}
+      {latestError && <ErrorPrompt error={latestError} />}
+      <HistoryWidget history={dialogueHistory} />
+      <Board question={activeQuestion} gameState={gameState} />
+      {gameState !== null && <RecipesWidget state={gameState} />}
+      {gameState !== null && (
+        <InventoryWidget inventory={gameState.character.inventory} />
+      )}
     </div>
   );
 }

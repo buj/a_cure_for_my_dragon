@@ -74,6 +74,7 @@ export default function RecipesWidget(deps: { state: GameState }) {
   );
   return (
     <div className="recipes">
+      <h4>Recipes</h4>
       {recipesWidgets}
       <RecipeGeneratorWidget
         recipeGenerator={state.recipeGenerator}
