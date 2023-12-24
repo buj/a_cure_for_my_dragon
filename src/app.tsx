@@ -15,6 +15,7 @@ import {
   GameAction,
   GameActionType,
   WorldObjectType,
+  GameActionError,
 } from "./game";
 import { IPlayer, Prng, Prompt } from "./entities";
 import { Deferred, PromiseState, createDeferred, evalThunk } from "./utils";
@@ -692,6 +693,10 @@ function Board(deps: {
   );
 }
 
+function ErrorPrompt(deps: { error: GameActionError }) {
+  return <div className="errorPrompt">{JSON.stringify(deps.error)}</div>;
+}
+
 export default function Game() {
   const [activeQuestion, setActiveQuestion] = React.useState<Question | null>(
     null
@@ -700,6 +705,14 @@ export default function Game() {
   const [dialogueHistory, setDialogueHistory] = React.useState(
     new DialogueHistory()
   );
+  const [latestError, setError] = React.useState<GameActionError | null>(null);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setError(null);
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [latestError, setError]);
 
   React.useEffect(() => {
     const onNewActiveQuestion = (q: Question) => {
@@ -724,11 +737,12 @@ export default function Game() {
     };
     const player = new UIPlayer(onNewActiveQuestion, onShow);
     const prng = new Prng("164012421");
-    runGame(prng, player);
+    runGame(prng, player, setError);
   }, [setActiveQuestion, setGameState, setDialogueHistory]);
 
   return (
     <div className="game">
+      {latestError && <ErrorPrompt error={latestError}></ErrorPrompt>}
       <HistoryWidget history={dialogueHistory}></HistoryWidget>
       <Board question={activeQuestion} gameState={gameState}></Board>
       {gameState !== null && <RecipesWidget state={gameState}></RecipesWidget>}

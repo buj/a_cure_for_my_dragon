@@ -1,3 +1,4 @@
+import { Either, left, right } from "fp-ts/lib/Either";
 import { ControlledInput, IInput, IPlayer, Prng, Prompt } from "./entities";
 import { QuestionContext, RngContext, ShowContext } from "./protocol";
 import { evalThunk } from "./utils";
@@ -257,17 +258,22 @@ export namespace Village {
     prompt: Prompt<RngContext>,
     rng: IInput<RngContext>,
     input: { village: Village; lostPagesGenerator: LostPagesGenerator }
-  ): Promise<{
-    village: Village;
-    lostPagesGenerator: LostPagesGenerator;
-  } | null> {
+  ): Promise<
+    Either<
+      "nothing to reveal",
+      {
+        village: Village;
+        lostPagesGenerator: LostPagesGenerator;
+      }
+    >
+  > {
     const { village, lostPagesGenerator } = input;
     if (village.pages.length != 0) {
-      return null;
+      return left("nothing to reveal");
     }
     const { lostPage, generator: newLostPagesGenerator } =
       await LostPagesGenerator.generate(prompt, rng, lostPagesGenerator);
-    return {
+    return right({
       village: {
         pages: [
           {
@@ -278,7 +284,7 @@ export namespace Village {
         ],
       },
       lostPagesGenerator: newLostPagesGenerator,
-    };
+    });
   }
 
   export async function purchasePage(
@@ -289,19 +295,24 @@ export namespace Village {
       village: Village;
       lostPagesGenerator: LostPagesGenerator;
     }
-  ): Promise<{
-    inventory: Inventory;
-    village: Village;
-    lostPagesGenerator: LostPagesGenerator;
-  } | null> {
+  ): Promise<
+    Either<
+      "nothing to purchase" | "not enough resources",
+      {
+        inventory: Inventory;
+        village: Village;
+        lostPagesGenerator: LostPagesGenerator;
+      }
+    >
+  > {
     const { inventory, village, lostPagesGenerator } = input;
     const currPage = village.pages.slice(-1)[0]!;
     if (currPage.purchased) {
-      return null;
+      return left("nothing to purchase");
     }
     const playerNumResources = inventory.alchemy[currPage.page.cost];
     if (playerNumResources < currPage.cost) {
-      return null;
+      return left("not enough resources");
     }
     const newVillage: Village = {
       pages: [
@@ -326,7 +337,7 @@ export namespace Village {
       });
       newLostPagesGenerator = generator;
     }
-    return {
+    return right({
       inventory: {
         ...inventory,
         alchemy: {
@@ -336,7 +347,7 @@ export namespace Village {
       },
       village: newVillage,
       lostPagesGenerator: newLostPagesGenerator,
-    };
+    });
   }
 }
 
@@ -387,13 +398,16 @@ export namespace Recipe {
     recipe: Recipe;
     inventory: Inventory;
     contribution: { [key in AlchemicalResource]?: number };
-  }): {
-    recipe: Recipe;
-    inventory: Inventory;
-  } | null {
+  }): Either<
+    "recipe not in contributable state",
+    {
+      recipe: Recipe;
+      inventory: Inventory;
+    }
+  > {
     const { recipe, inventory, contribution } = input;
     if (!("ingredientsCollected" in recipe)) {
-      return null;
+      return left("recipe not in contributable state");
     }
     const newInventory: Inventory = {
       ...inventory,
@@ -415,7 +429,7 @@ export namespace Recipe {
         ingredientContribution;
     }
     if (isRecipe3WithAllIngredientsCollected(newRecipe)) {
-      return {
+      return right({
         recipe: {
           dialect: newRecipe.dialect,
           numPages: newRecipe.numPages,
@@ -423,12 +437,12 @@ export namespace Recipe {
           finished: true,
         },
         inventory: newInventory,
-      };
+      });
     } else {
-      return {
+      return right({
         recipe: newRecipe,
         inventory: newInventory,
-      };
+      });
     }
   }
 }
@@ -464,10 +478,15 @@ export namespace RecipeGenerator {
       recipeGenerator: RecipeGenerator;
       recipe: Recipe;
     }
-  ): Promise<{
-    recipeGenerator: RecipeGenerator;
-    recipe: Recipe;
-  } | null> {
+  ): Promise<
+    Either<
+      "recipe is fully known, nothing to generate",
+      {
+        recipeGenerator: RecipeGenerator;
+        recipe: Recipe;
+      }
+    >
+  > {
     const { recipeGenerator, recipe } = input;
     if (recipe.dialect === null) {
       const ctx: Prompt<RngContext> = {
@@ -480,7 +499,7 @@ export namespace RecipeGenerator {
           ctx,
           recipeGenerator.remainingDialects
         );
-      return {
+      return right({
         recipeGenerator: {
           ...recipeGenerator,
           remainingDialects,
@@ -489,7 +508,7 @@ export namespace RecipeGenerator {
           dialect,
           numPages: recipe.numPages,
         },
-      };
+      });
     } else if (!("ingredients" in recipe)) {
       const { chosen: ingredientsCombo, rest: remainingIngredientsCombos } =
         await IInput.chooseFromListWithoutReplacement(
@@ -519,7 +538,7 @@ export namespace RecipeGenerator {
           },
           ingredientsRemainingCounts
         );
-      return {
+      return right({
         recipeGenerator: {
           ...recipeGenerator,
           ingredientsRemainingCombinations: remainingIngredientsCombos,
@@ -534,9 +553,9 @@ export namespace RecipeGenerator {
           },
           ingredientsCollected: {},
         },
-      };
+      });
     } else {
-      return null;
+      return left("recipe is fully known, nothing to generate");
     }
   }
 }
@@ -1058,19 +1077,19 @@ export class Character {
   public tradeItems = (
     cost: InventoryOpt,
     gain: InventoryOpt
-  ): Character | null => {
+  ): Either<"could not pay the cost", Character> => {
     const afterCost = Inventory.subtract(this.inventory, cost);
     if (afterCost === null) {
-      return null;
+      return left("could not pay the cost");
     }
     const newInventory = Inventory.limit(
       Inventory.add(afterCost, gain),
       this.storageCapacity()
     );
-    return {
+    return right({
       ...this,
       inventory: newInventory,
-    };
+    });
   };
 }
 
@@ -1123,12 +1142,15 @@ export namespace GameState {
   export function moveCharacter(
     target: Position,
     gameState: GameState
-  ): GameState | null {
+  ): Either<"target is out of bounds" | "target is occupied", GameState> {
     const targetCell = gameState.world.get(target);
-    if (targetCell === null || targetCell.object !== undefined) {
-      return null;
+    if (targetCell === null) {
+      return left("target is out of bounds");
     }
-    return {
+    if (targetCell.object !== undefined) {
+      return left("target is occupied");
+    }
+    return right({
       ...gameState,
       turnNumber: gameState.turnNumber + 1,
       charPos: target,
@@ -1141,7 +1163,7 @@ export namespace GameState {
           },
         },
       }),
-    };
+    });
   }
 }
 
@@ -1292,10 +1314,13 @@ export type GameAction = {
   target: Position;
 };
 
+export type GameActionError = { msg: string; data?: any };
+export type GameActionResult<T> = Either<GameActionError, T>;
+
 function moveAction(
   target: Position,
   game: BootstrappedGame
-): BootstrappedGame | null {
+): GameActionResult<BootstrappedGame> {
   const movementSpeed = game.state.character.movementSpeed();
   const targetCell = World.canReachAndEndTurnThere(
     game.state.world,
@@ -1305,13 +1330,26 @@ function moveAction(
     game.state.character.canTraverse
   );
   if (targetCell === null) {
-    return null;
+    return left({
+      msg: "target is unreachable",
+      data: {
+        target,
+        targetCell,
+      },
+    });
   }
   const newState = GameState.moveCharacter(target, game.state);
-  if (newState === null) {
-    return null;
+  if (newState._tag === "Left") {
+    return left({
+      msg: "could not move to target",
+      data: {
+        reason: newState.left,
+        target,
+        targetCell,
+      },
+    });
   }
-  return game.withState(newState);
+  return right(game.withState(newState.right));
 }
 
 function caveBarrel(
@@ -1332,12 +1370,12 @@ function caveBarrel(
 async function enterCave(
   pos: Position,
   game: BootstrappedGame
-): Promise<BootstrappedGame | null> {
+): Promise<GameActionResult<BootstrappedGame>> {
   if (!game.state.character.skills.includes(Skill.Spelunking)) {
-    return null;
+    return left({ msg: "skill Spelunking is required for entering the cave" });
   }
   if (pos === game.state.lastVisitedCave) {
-    return null;
+    return left({ msg: "cannot enter the cave that you visited last time" });
   }
   const cell = game.state.world.get(pos);
   if (
@@ -1345,7 +1383,7 @@ async function enterCave(
     cell.object === undefined ||
     cell.object.type !== WorldObjectType.Cave
   ) {
-    return null;
+    return left({ msg: "target is not a cave", data: { pos, cell } });
   }
 
   const possibleExits = World.listCellsCanReachAndCanEndTurnThere(
@@ -1355,7 +1393,9 @@ async function enterCave(
     game.state.character.canTraverse
   ).map(({ pos }) => pos);
   if (possibleExits.length === 0) {
-    return null;
+    return left({
+      msg: "cannot enter cave, because there are no valid exit cells",
+    });
   }
 
   // barrel1
@@ -1434,22 +1474,27 @@ async function enterCave(
     possibleExits
   );
   const state3 = GameState.moveCharacter(exitPos, state2);
-  if (state3 === null) {
-    return null;
+  if (state3._tag === "Left") {
+    return left({
+      msg: "could not exit out of portal, cancelling portal traversal",
+      data: {
+        reason: state3.left,
+        target: exitPos,
+      },
+    });
   }
 
-  return game.withState(state3);
+  return right(game.withState(state3.right));
 }
 
 async function interactWithPortal(
   portalPos: Position,
   game: BootstrappedGame
-): Promise<BootstrappedGame | null> {
+): Promise<GameActionResult<BootstrappedGame>> {
   if (!game.state.character.artifacts.includes(Artifact.PortalStone)) {
-    return null;
-  }
-  if (!Position.areAdjacent(portalPos, game.state.charPos)) {
-    return null;
+    return left({
+      msg: "portal stone is required in order to travel through a portal",
+    });
   }
   const otherPortalsHexes = game.state.world
     .listHexes()
@@ -1475,20 +1520,30 @@ async function interactWithPortal(
     candExits
   );
   const newState = GameState.moveCharacter(dest, game.state);
-  if (newState === null) {
-    return null;
+  if (newState._tag === "Left") {
+    return left({
+      msg: newState.left,
+      data: {
+        target: dest,
+      },
+    });
   }
-  return game.withState(newState);
+  return right(game.withState(newState.right));
 }
 
 function buildProductionBuilding(
   pos: Position,
   cell: Cell,
   game: BootstrappedGame
-): BootstrappedGame | null {
+): GameActionResult<BootstrappedGame> {
   const newCharacterState = game.state.character.tradeItems({ rubies: 1 }, {});
-  if (newCharacterState === null) {
-    return null;
+  if (newCharacterState._tag === "Left") {
+    return left({
+      msg: "could not build production building",
+      data: {
+        reason: newCharacterState.left,
+      },
+    });
   }
 
   var produce: AlchemicalResource;
@@ -1506,7 +1561,13 @@ function buildProductionBuilding(
       break;
     }
     default: {
-      return null;
+      return left({
+        msg: "could not build, because there is nothing to be built on this terrain",
+        data: {
+          pos,
+          cell,
+        },
+      });
     }
   }
   const newWorld = game.state.world.set(pos, {
@@ -1518,36 +1579,42 @@ function buildProductionBuilding(
       },
     },
   });
-  return game.withState({
-    ...game.state,
-    world: newWorld,
-    character: newCharacterState,
-  });
+  return right(
+    game.withState({
+      ...game.state,
+      world: newWorld,
+      character: newCharacterState.right,
+    })
+  );
 }
 
 function interactWithProductionBuilding(
   produce: AlchemicalResource,
   game: BootstrappedGame
-): BootstrappedGame | null {
+): GameActionResult<BootstrappedGame> {
   const newCharacterState = game.state.character.gainItems({
     [produce]: 10,
   });
-  return game.withState({
-    ...game.state,
-    character: newCharacterState,
-  });
+  return right(
+    game.withState({
+      ...game.state,
+      character: newCharacterState,
+    })
+  );
 }
 
 async function interactWithVillage(
   pos: Position,
   cell: Cell,
   game: BootstrappedGame
-): Promise<BootstrappedGame | null> {
+): Promise<GameActionResult<BootstrappedGame>> {
   if (
     cell.object === undefined ||
     cell.object.type !== WorldObjectType.Village
   ) {
-    return null;
+    return left({
+      msg: "target position does not contain a village",
+    });
   }
   const village = cell.object.data;
   if (village.pages.length === 0) {
@@ -1562,21 +1629,23 @@ async function interactWithVillage(
         lostPagesGenerator: game.state.lostPagesGenerator,
       }
     );
-    if (afterReveal === null) {
-      return null;
+    if (afterReveal._tag === "Left") {
+      return left({
+        msg: "internal error",
+      });
     }
     const newState: GameState = {
       ...game.state,
-      lostPagesGenerator: afterReveal.lostPagesGenerator,
+      lostPagesGenerator: afterReveal.right.lostPagesGenerator,
       world: game.state.world.set(pos, {
         terrain: cell.terrain,
         object: {
           type: WorldObjectType.Village,
-          data: afterReveal.village,
+          data: afterReveal.right.village,
         },
       }),
     };
-    return game.withState(newState);
+    return right(game.withState(newState));
   } else {
     const afterPurchase = await Village.purchasePage(
       {
@@ -1590,25 +1659,26 @@ async function interactWithVillage(
         lostPagesGenerator: game.state.lostPagesGenerator,
       }
     );
-    if (afterPurchase === null) {
-      return null;
+    if (afterPurchase._tag === "Left") {
+      return left({
+        msg: afterPurchase.left,
+      });
     }
     const newState: GameState = {
       ...game.state,
-      character: game.state.character.withInventory(afterPurchase.inventory),
-      lostPagesGenerator: afterPurchase.lostPagesGenerator,
+      character: game.state.character.withInventory(
+        afterPurchase.right.inventory
+      ),
+      lostPagesGenerator: afterPurchase.right.lostPagesGenerator,
       world: game.state.world.set(pos, {
         terrain: cell.terrain,
         object: {
           type: WorldObjectType.Village,
-          data: afterPurchase.village,
+          data: afterPurchase.right.village,
         },
       }),
     };
-    if (newState === null) {
-      return null;
-    }
-    return game.withState(newState);
+    return right(game.withState(newState));
   }
 }
 
@@ -1620,7 +1690,7 @@ export enum MarketTradeType {
 
 async function interactWithMarket(
   game: BootstrappedGame
-): Promise<BootstrappedGame | null> {
+): Promise<GameActionResult<BootstrappedGame>> {
   const tradeType = await game.player.chooseFromList(
     {
       context: "interactWithMarket.tradeType",
@@ -1675,13 +1745,20 @@ async function interactWithMarket(
     }
   }
   const newCharacterState = game.state.character.tradeItems(lhs, rhs);
-  if (newCharacterState === null) {
-    return null;
+  if (newCharacterState._tag === "Left") {
+    return left({
+      msg: "interaction with market failed",
+      data: {
+        reason: newCharacterState.left,
+      },
+    });
   }
-  return game.withState({
-    ...game.state,
-    character: newCharacterState,
-  });
+  return right(
+    game.withState({
+      ...game.state,
+      character: newCharacterState.right,
+    })
+  );
 }
 
 export enum MarlonInteractionType {
@@ -1692,7 +1769,7 @@ export enum MarlonInteractionType {
 
 async function interactWithMarlon(
   game: BootstrappedGame
-): Promise<BootstrappedGame | null> {
+): Promise<GameActionResult<BootstrappedGame>> {
   const interactionType = await game.player.chooseFromList(
     {
       context: "interactWithMarlon.type",
@@ -1731,23 +1808,29 @@ async function interactWithMarlon(
           recipe,
         }
       );
-      if (result === null) {
-        return null;
+      if (result._tag === "Left") {
+        return left({
+          msg: result.left,
+        });
       }
       const newRecipes = [...game.state.recipes];
-      newRecipes[idx] = result.recipe;
+      newRecipes[idx] = result.right.recipe;
       const newInventory = Inventory.subtract(game.state.character.inventory, {
         rubies: recipe.rubiesCost,
       });
       if (newInventory === null) {
-        return null;
+        return left({
+          msg: "could not pay the cost for revealing recipe dialect",
+        });
       }
-      return game.withState({
-        ...game.state,
-        recipes: newRecipes,
-        recipeGenerator: result.recipeGenerator,
-        character: game.state.character.withInventory(newInventory),
-      });
+      return right(
+        game.withState({
+          ...game.state,
+          recipes: newRecipes,
+          recipeGenerator: result.right.recipeGenerator,
+          character: game.state.character.withInventory(newInventory),
+        })
+      );
     }
     case MarlonInteractionType.RevealIngredients: {
       const choices = [...game.state.recipes.entries()].flatMap(
@@ -1775,23 +1858,29 @@ async function interactWithMarlon(
           recipe,
         }
       );
-      if (result === null) {
-        return null;
+      if (result._tag === "Left") {
+        return left({
+          msg: result.left,
+        });
       }
       const newRecipes = [...game.state.recipes];
-      newRecipes[idx] = result.recipe;
+      newRecipes[idx] = result.right.recipe;
       const newInventory = Inventory.subtract(game.state.character.inventory, {
         translatedPages: { [recipe.dialect]: recipe.numPages },
       });
       if (newInventory === null) {
-        return null;
+        return left({
+          msg: "could not pay the cost for revealing recipe ingredients",
+        });
       }
-      return game.withState({
-        ...game.state,
-        recipes: newRecipes,
-        recipeGenerator: result.recipeGenerator,
-        character: game.state.character.withInventory(newInventory),
-      });
+      return right(
+        game.withState({
+          ...game.state,
+          recipes: newRecipes,
+          recipeGenerator: result.right.recipeGenerator,
+          character: game.state.character.withInventory(newInventory),
+        })
+      );
     }
     case MarlonInteractionType.GiveIngredients: {
       const choices = [...game.state.recipes.entries()].flatMap(
@@ -1836,25 +1925,31 @@ async function interactWithMarlon(
         inventory: game.state.character.inventory,
         contribution,
       });
-      if (result === null) {
-        return null;
+      if (result._tag === "Left") {
+        return left({
+          msg: result.left,
+        });
       }
       const newRecipes = [...game.state.recipes];
-      newRecipes[idx] = result.recipe;
-      return game.withState({
-        ...game.state,
-        recipes: newRecipes,
-        character: game.state.character.withInventory(result.inventory),
-      });
+      newRecipes[idx] = result.right.recipe;
+      return right(
+        game.withState({
+          ...game.state,
+          recipes: newRecipes,
+          character: game.state.character.withInventory(result.right.inventory),
+        })
+      );
     }
   }
 }
 
 async function interactWithMerchant(
   game: BootstrappedGame
-): Promise<BootstrappedGame | null> {
+): Promise<GameActionResult<BootstrappedGame>> {
   if (!game.state.character.skills.includes(Skill.Negotiation)) {
-    return null;
+    return left({
+      msg: "interaction with merchant requires the Negotiation skill",
+    });
   }
   const choices: Set<Dialect> = new Set();
   for (const d in Dialect) {
@@ -1866,7 +1961,9 @@ async function interactWithMerchant(
     }
   }
   if (choices.size === 0) {
-    return null;
+    return left({
+      msg: "no tradable pages",
+    });
   }
   const tradeWhat = await game.player.chooseFromList(
     {
@@ -1891,13 +1988,17 @@ async function interactWithMerchant(
   const newCharacterState = game.state.character.tradeItems(cost, {
     rawPages: { [tradeFor]: 1 },
   });
-  if (newCharacterState === null) {
-    return null;
+  if (newCharacterState._tag === "Left") {
+    return left({
+      msg: newCharacterState.left,
+    });
   }
-  return game.withState({
-    ...game.state,
-    character: newCharacterState,
-  });
+  return right(
+    game.withState({
+      ...game.state,
+      character: newCharacterState.right,
+    })
+  );
 }
 
 function sageLearnableSkills(sageId: SageId): Skill[] {
@@ -1914,7 +2015,7 @@ function sageLearnableSkills(sageId: SageId): Skill[] {
 async function interactWithSage(
   sageId: SageId,
   game: BootstrappedGame
-): Promise<BootstrappedGame | null> {
+): Promise<GameActionResult<BootstrappedGame>> {
   const whatCanBeTranslated = [
     Dialect.Bird,
     Dialect.Dragonfly,
@@ -1922,7 +2023,9 @@ async function interactWithSage(
     Dialect.Mouse,
   ].filter((d) => game.state.character.inventory.rawPages[d] > 0);
   if (whatCanBeTranslated.length === 0) {
-    return null;
+    return left({
+      msg: "nothing to translate",
+    });
   }
   const translateWhat = await game.player.chooseFromList(
     {
@@ -1937,12 +2040,14 @@ async function interactWithSage(
     ),
     null,
   ];
-  var newCharacterState = game.state.character.tradeItems(
+  const newCharacterStateResult = game.state.character.tradeItems(
     { rawPages: { [translateWhat]: 1 } },
     { translatedPages: { [translateWhat]: 1 } }
   );
-  if (newCharacterState === null) {
-    return null;
+  if (newCharacterStateResult._tag === "Left") {
+    return left({
+      msg: newCharacterStateResult.left,
+    });
   }
   const learnWhat =
     learnableSkills.length > 1
@@ -1954,33 +2059,37 @@ async function interactWithSage(
           learnableSkills
         )
       : null;
+  var newCharacterState = newCharacterStateResult.right;
   if (learnWhat !== null) {
-    newCharacterState = newCharacterState.withSkill(learnWhat);
-    if (newCharacterState === null) {
-      return null;
-    }
+    newCharacterState = newCharacterStateResult.right.withSkill(learnWhat);
   }
-  return game.withState({
-    ...game.state,
-    character: newCharacterState,
-  });
+  return right(
+    game.withState({
+      ...game.state,
+      character: newCharacterState,
+    })
+  );
 }
 
 async function takeAction(
   action: GameAction,
   game: BootstrappedGame
-): Promise<BootstrappedGame | null> {
+): Promise<GameActionResult<BootstrappedGame>> {
   const afterAction = await evalThunk(async () => {
     switch (action.type) {
       case GameActionType.Move:
         return moveAction(action.target, game);
       case GameActionType.Interact: {
         if (!Position.areAdjacent(action.target, game.state.charPos)) {
-          return null;
+          return left({
+            msg: "can interact only with adjacent cells",
+          });
         }
         const cell = game.state.world.get(action.target);
         if (cell === null) {
-          return null;
+          return left({
+            msg: "cannot interact with cell that is out of bounds",
+          });
         }
         if (cell.object === undefined) {
           return buildProductionBuilding(action.target, cell, game);
@@ -2006,20 +2115,26 @@ async function takeAction(
           case WorldObjectType.Village:
             return interactWithVillage(action.target, cell, game);
           default:
-            return null;
+            return left({
+              msg: "no interaction to be had there",
+              data: {
+                cell,
+              },
+            });
         }
       }
     }
   });
-  if (afterAction === null) {
-    return null;
+  if (afterAction._tag === "Left") {
+    return afterAction;
   }
-  return afterAction.advancePromptNumber();
+  return right(afterAction.right.advancePromptNumber());
 }
 
 export async function runGame(
   sourceRng: Prng<RngContext>,
-  player: IPlayer<QuestionContext, ShowContext>
+  player: IPlayer<QuestionContext, ShowContext>,
+  errorHandler: (e: GameActionError) => void
 ) {
   var game = await BootstrappedGame.createInitial(sourceRng, player);
   while (true) {
@@ -2054,8 +2169,15 @@ export async function runGame(
       [...possibleMoves, ...possibleInteractions]
     );
     const game2 = await takeAction(action, game.advancePromptNumber());
-    if (game2 !== null) {
-      game = game2;
+    switch (game2._tag) {
+      case "Left": {
+        errorHandler(game2.left);
+        break;
+      }
+      case "Right": {
+        game = game2.right;
+        break;
+      }
     }
   }
 }
