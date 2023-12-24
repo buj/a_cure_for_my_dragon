@@ -309,8 +309,8 @@ export namespace Village {
     >
   > {
     const { inventory, village, lostPagesGenerator } = input;
-    const currPage = village.pages.slice(-1)[0]!;
-    if (currPage.purchased) {
+    const currPage = village.pages.slice(-1)[0];
+    if (currPage === undefined || currPage.purchased) {
       return left("nothing to purchase");
     }
     const playerNumResources = inventory.alchemy[currPage.page.cost];
