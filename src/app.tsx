@@ -56,7 +56,7 @@ function alchemyStr(a: string): string {
 }
 
 function unaryStr(n: number, unit: string = "☐"): string {
-  return Array(n).fill(unit).flat().join();
+  return Array(n).fill(unit).flat().join("");
 }
 
 function progressBarStr(numerator: number, denominator: number): string {
@@ -93,7 +93,7 @@ function inventoryOptToString(x: InventoryOpt): string {
 function RecipeWidget(deps: { recipe: Recipe }) {
   const { recipe } = deps;
   if (recipe.dialect === null) {
-    const costStr = Array(recipe.rubiesCost).fill("💎").flat().join();
+    const costStr = Array(recipe.rubiesCost).fill("💎").flat().join("");
     const numPagesStr = `[?]⨉${recipe.numPages}`;
     return (
       <div className="recipe">
