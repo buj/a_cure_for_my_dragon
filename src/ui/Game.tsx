@@ -16,7 +16,7 @@ import LostPagesWidget from "./LostPagesWidget";
 import { alchemyStr, dialectStr, progressBarStr, unaryStr } from "./utils";
 
 function ErrorPrompt(deps: { error: GameActionError }) {
-  return <div className="errorPrompt">{JSON.stringify(deps.error)}</div>;
+  return <div className="errorPrompt window">{JSON.stringify(deps.error)}</div>;
 }
 
 function InventoryWidget(deps: { inventory: Inventory }) {
@@ -48,7 +48,7 @@ function InventoryWidget(deps: { inventory: Inventory }) {
     }
   }
   return (
-    <div className="inventory">
+    <div className="inventory window">
       <h4>Inventory</h4>
       {elems}
     </div>
@@ -99,17 +99,34 @@ export default function Game() {
   }, [setActiveQuestion, setGameState, setDialogueHistory]);
 
   return (
-    <div className="game">
+    <div
+      className="game"
+      style={{ display: "flex", flexDirection: "column", height: "95vh" }}
+    >
+      <div style={{ display: "flex", overflowY: "clip", flexGrow: 1 }}>
+        <div
+          style={{
+            width: "20%",
+            height: "100%",
+            overflowY: "auto",
+          }}
+        >
+          <HistoryWidget history={dialogueHistory} />
+        </div>
+        <div style={{ width: "60%", maxHeight: "100%" }}>
+          <Board question={activeQuestion} gameState={gameState} />
+        </div>
+        {gameState !== null && (
+          <div style={{ width: "20%", height: "100%", overflowY: "auto" }}>
+            <RecipesWidget state={gameState} />
+            <LostPagesWidget
+              lostPagesGenerator={gameState.lostPagesGenerator}
+            />
+            <InventoryWidget inventory={gameState.character.inventory} />
+          </div>
+        )}
+      </div>
       {latestError && <ErrorPrompt error={latestError} />}
-      <HistoryWidget history={dialogueHistory} />
-      <Board question={activeQuestion} gameState={gameState} />
-      {gameState !== null && <RecipesWidget state={gameState} />}
-      {gameState !== null && (
-        <LostPagesWidget lostPagesGenerator={gameState.lostPagesGenerator} />
-      )}
-      {gameState !== null && (
-        <InventoryWidget inventory={gameState.character.inventory} />
-      )}
     </div>
   );
 }

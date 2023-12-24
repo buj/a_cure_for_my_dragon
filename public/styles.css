@@ -1,8 +1,26 @@
 .lostPagesGeneratorPage:not(.current) {
-    opacity: 0.5;
+  opacity: 0.5;
 }
 
 .villagePage.purchased {
-    opacity: 0.5;
-    text-decoration: line-through;
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.window {
+  padding: 0.5em;
+  border-style: solid;
+  border-width: 0.1em;
+}
+
+.errorPrompt {
+  background-color: #ff8888;
+}
+
+h4, h5, h6 {
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
 }

@@ -261,7 +261,7 @@ export default function Board(deps: {
   return (
     <svg
       ref={svgRef}
-      width="80%"
+      width="100%"
       viewBox="0 0 1052 744"
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}

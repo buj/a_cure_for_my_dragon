@@ -73,7 +73,7 @@ export default function RecipesWidget(deps: { state: GameState }) {
     RecipeWidget({ recipe })
   );
   return (
-    <div className="recipes">
+    <div className="recipes window">
       <h4>Recipes</h4>
       {recipesWidgets}
       <RecipeGeneratorWidget

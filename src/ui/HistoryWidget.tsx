@@ -145,7 +145,7 @@ function DialogueEntryVisualization(d: DialogueEntry) {
         }
       });
       return (
-        <div key={`Q(${d.data.prompt.key})`} className="historyQuestionEntry">
+        <div key={`Q(${d.data.prompt.key})`} className="historyEntry window">
           <div>{`❓: ${questionText}`}</div>
           {answerElem}
         </div>
@@ -169,7 +169,7 @@ function DialogueEntryVisualization(d: DialogueEntry) {
         }
       });
       return (
-        <div key={`S(${d.data.prompt.key})`} className="historyShowEntry">
+        <div key={`S(${d.data.prompt.key})`} className="historyEntry window">
           💬: {content}
         </div>
       );
@@ -179,11 +179,39 @@ function DialogueEntryVisualization(d: DialogueEntry) {
 
 export default function HistoryWidget(deps: { history: DialogueHistory }) {
   const { history } = deps;
-  return (
-    <div className="history">
-      {history.getHistory().map(DialogueEntryVisualization)}
-    </div>
-  );
+
+  // filter out gameState updates that do not correspond to moves
+  const ls = evalThunk(() => {
+    var lastTurnNumber: number = -1;
+    var tmp: DialogueEntry[] = [];
+    for (const d of history.getHistory()) {
+      switch (d.type) {
+        case "question": {
+          tmp.push(d);
+          break;
+        }
+        case "show": {
+          switch (d.data.prompt.context) {
+            case "gameState": {
+              const turnNumber = (d.data.what as GameState).turnNumber;
+              if (turnNumber > lastTurnNumber) {
+                lastTurnNumber = turnNumber;
+                tmp.push(d);
+              }
+              break;
+            }
+            default: {
+              tmp.push(d);
+              break;
+            }
+          }
+        }
+      }
+    }
+    return tmp;
+  });
+
+  return <div className="history">{ls.map(DialogueEntryVisualization)}</div>;
 }
 
 function PendingQuestionChoices(deps: { question: Question }) {

@@ -22,7 +22,7 @@ export default function LostPagesWidget(deps: {
     LostPageWidget(page, idx === lostPagesGenerator.pos)
   );
   return (
-    <div className="lostPagesGenerator">
+    <div className="lostPagesGenerator window">
       <h4>Lost pages</h4>
       {elems}
     </div>
