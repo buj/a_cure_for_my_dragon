@@ -12,6 +12,7 @@ import HistoryWidget, { DialogueHistory } from "./HistoryWidget";
 import { Prng } from "../entities";
 import Board from "./Board";
 import RecipesWidget from "./RecipesWidget";
+import LostPagesWidget from "./LostPagesWidget";
 import { alchemyStr, dialectStr, progressBarStr, unaryStr } from "./utils";
 
 function ErrorPrompt(deps: { error: GameActionError }) {
@@ -103,6 +104,9 @@ export default function Game() {
       <HistoryWidget history={dialogueHistory} />
       <Board question={activeQuestion} gameState={gameState} />
       {gameState !== null && <RecipesWidget state={gameState} />}
+      {gameState !== null && (
+        <LostPagesWidget lostPagesGenerator={gameState.lostPagesGenerator} />
+      )}
       {gameState !== null && (
         <InventoryWidget inventory={gameState.character.inventory} />
       )}
