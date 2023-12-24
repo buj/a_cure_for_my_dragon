@@ -348,21 +348,33 @@ function DialogueEntryVisualization(d: DialogueEntry) {
   switch (d.type) {
     case "question": {
       const questionText = translateQuestionContext(d.data.prompt.context);
-      const answerText = evalThunk(() => {
+      const answerElem = evalThunk(() => {
         const answer = d.data.answer.getSync();
         switch (answer.state) {
           case PromiseState.Pending:
-            return "...";
-          case PromiseState.Resolved:
-            return JSON.stringify(answer.value);
+            return (
+              <PendingQuestionChoices
+                question={d.data}
+              ></PendingQuestionChoices>
+            );
+          case PromiseState.Resolved: {
+            switch (d.data.query.type) {
+              case "chooseFromList":
+                return (
+                  <div>{JSON.stringify(d.data.query.ls[answer.value])}</div>
+                );
+              case "chooseFromRange":
+                return <div>{JSON.stringify(answer.value)}</div>;
+            }
+          }
           case PromiseState.Rejected:
-            return `<error: ${JSON.stringify(answer.reason)}>`;
+            return <div>{`<error: ${JSON.stringify(answer.reason)}>`}</div>;
         }
       });
       return (
         <div key={`Q(${d.data.prompt.key})`} className="historyQuestionEntry">
           <div>{`❓: ${questionText}`}</div>
-          <div>{answerText}</div>
+          {answerElem}
         </div>
       );
     }
@@ -401,11 +413,10 @@ function HistoryWidget(deps: { history: DialogueHistory }) {
   );
 }
 
-function ActiveQuestionWidget(deps: { question: Question }) {
+function PendingQuestionChoices(deps: { question: Question }) {
   const { question: q } = deps;
-  const questionText = translateQuestionContext(q.prompt.context);
   if (isPositionalQuestion(q.prompt.context)) {
-    return <div className="activeQuestion">{questionText}</div>;
+    return;
   }
   switch (q.query.type) {
     case "chooseFromList": {
@@ -419,12 +430,7 @@ function ActiveQuestionWidget(deps: { question: Question }) {
           </button>
         );
       });
-      return (
-        <div className="activeQuestion">
-          {questionText}
-          {optionsButtons}
-        </div>
-      );
+      return <>{optionsButtons}</>;
     }
     case "chooseFromRange": {
       const [value, setValue] = React.useState(q.query.l);
@@ -435,8 +441,7 @@ function ActiveQuestionWidget(deps: { question: Question }) {
         q.answer.resolve(value);
       };
       return (
-        <div className="activeQuestion">
-          {questionText}
+        <>
           <input
             type="number"
             min={q.query.l}
@@ -446,7 +451,7 @@ function ActiveQuestionWidget(deps: { question: Question }) {
             onChange={handleChange}
           />
           <button onClick={submit}>Submit</button>
-        </div>
+        </>
       );
     }
   }
@@ -545,7 +550,7 @@ namespace BoardImpl {
     });
   }
 
-  export function onClick(
+  export function onMouseDown(
     q: Question,
     event: React.MouseEvent<SVGSVGElement>,
     svgRef: React.RefObject<SVGSVGElement>
@@ -649,12 +654,12 @@ function Board(deps: {
   const { question, gameState } = deps;
   const svgRef = React.useRef<SVGSVGElement>(null);
   const cursorRef = React.useRef<SVGCircleElement>(null);
-  const onClick = evalThunk(() => {
+  const onMouseDown = evalThunk(() => {
     if (question === null) {
       return undefined;
     }
     return (e: React.MouseEvent<SVGSVGElement>) => {
-      BoardImpl.onClick(question, e, svgRef);
+      BoardImpl.onMouseDown(question, e, svgRef);
     };
   });
   const onMouseMove = evalThunk(() => {
@@ -670,7 +675,7 @@ function Board(deps: {
       ref={svgRef}
       width="80%"
       viewBox="0 0 1052 744"
-      onClick={onClick}
+      onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
     >
       <image href="board.svg" width="100%" height="100%" />
@@ -697,7 +702,16 @@ export default function Game() {
   );
 
   React.useEffect(() => {
-    const show = (s: Show) => {
+    const onNewActiveQuestion = (q: Question) => {
+      setDialogueHistory((dialogueHistory) =>
+        dialogueHistory.add({
+          type: "question",
+          data: q,
+        })
+      );
+      setActiveQuestion(q);
+    };
+    const onShow = (s: Show) => {
       setDialogueHistory((dialogueHistory) =>
         dialogueHistory.add({
           type: "show",
@@ -708,16 +722,13 @@ export default function Game() {
         setGameState(s.what);
       }
     };
-    const player = new UIPlayer(setActiveQuestion, show);
+    const player = new UIPlayer(onNewActiveQuestion, onShow);
     const prng = new Prng("164012421");
     runGame(prng, player);
   }, [setActiveQuestion, setGameState, setDialogueHistory]);
 
   return (
     <div className="game">
-      {activeQuestion !== null && (
-        <ActiveQuestionWidget question={activeQuestion}></ActiveQuestionWidget>
-      )}
       <HistoryWidget history={dialogueHistory}></HistoryWidget>
       <Board question={activeQuestion} gameState={gameState}></Board>
       {gameState !== null && <RecipesWidget state={gameState}></RecipesWidget>}

@@ -169,12 +169,12 @@ export namespace Inventory {
 }
 
 export enum Skill {
-  HeftyPockets,
-  Negotiation,
-  WoodlandExplorer,
-  SwiftBoots,
-  Spelunking,
-  Mountaineering,
+  HeftyPockets = "HeftyPockets",
+  Negotiation = "Negotiation",
+  WoodlandExplorer = "WoodlandExplorer",
+  SwiftBoots = "SwiftBoots",
+  Spelunking = "Spelunking",
+  Mountaineering = "Mountaineering",
 }
 
 export enum Artifact {
@@ -601,9 +601,9 @@ const defaultWorld: Array<[string, string]> = [
 ];
 
 export enum SageId {
-  WithChimney,
-  SharpRoof,
-  SmoothRoof,
+  WithChimney = "WithChimney",
+  SharpRoof = "SharpRoof",
+  SmoothRoof = "SmoothRoof",
 }
 
 type WorldObject = {
@@ -1283,8 +1283,8 @@ export namespace BootstrappedGame {
 }
 
 export enum GameActionType {
-  Move,
-  Interact,
+  Move = "Move",
+  Interact = "Interact",
 }
 
 export type GameAction = {
@@ -1607,9 +1607,9 @@ async function interactWithVillage(
 }
 
 export enum MarketTradeType {
-  GoodForGood,
-  RubyForGoods,
-  GoodsForRuby,
+  GoodForGood = "GoodForGood",
+  RubyForGoods = "RubyForGoods",
+  GoodsForRuby = "GoodsForRuby",
 }
 
 async function interactWithMarket(
@@ -1679,9 +1679,9 @@ async function interactWithMarket(
 }
 
 export enum MarlonInteractionType {
-  RevealDialect,
-  RevealIngredients,
-  GiveIngredients,
+  RevealDialect = "RevealDialect",
+  RevealIngredients = "RevealIngredients",
+  GiveIngredients = "GiveIngredients",
 }
 
 async function interactWithMarlon(
