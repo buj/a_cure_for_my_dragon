@@ -7,6 +7,10 @@
   text-decoration: line-through;
 }
 
+.skill:not(.learned) {
+  opacity: 0.5;
+}
+
 .window {
   padding: 0.5em;
   border-style: solid;

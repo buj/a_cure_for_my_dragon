@@ -1,10 +1,12 @@
 import React from "react";
 import {
   AlchemicalResource,
+  Character,
   Dialect,
   GameActionError,
   GameState,
   Inventory,
+  Skill,
   runGame,
 } from "../game";
 import { Question, Show, UIPlayer } from "./player";
@@ -19,14 +21,14 @@ function ErrorPrompt(deps: { error: GameActionError }) {
   return <div className="errorPrompt window">{JSON.stringify(deps.error)}</div>;
 }
 
-function InventoryWidget(deps: { inventory: Inventory }) {
-  const { inventory } = deps;
+function InventoryWidget(deps: { character: Character }) {
+  const { character } = deps;
   const elems: React.JSX.Element[] = [];
-  if (inventory.rubies > 0) {
-    elems.push(<div>💎: {unaryStr(inventory.rubies)}</div>);
+  if (character.inventory.rubies > 0) {
+    elems.push(<div>💎: {unaryStr(character.inventory.rubies)}</div>);
   }
   for (const a in AlchemicalResource) {
-    const count = inventory.alchemy[a as AlchemicalResource];
+    const count = character.inventory.alchemy[a as AlchemicalResource];
     if (count > 0) {
       elems.push(
         <div>
@@ -36,8 +38,8 @@ function InventoryWidget(deps: { inventory: Inventory }) {
     }
   }
   for (const d in Dialect) {
-    const rawCount = inventory.rawPages[d as Dialect];
-    const translatedCount = inventory.translatedPages[d as Dialect];
+    const rawCount = character.inventory.rawPages[d as Dialect];
+    const translatedCount = character.inventory.translatedPages[d as Dialect];
     if (rawCount + translatedCount > 0) {
       elems.push(
         <div>
@@ -50,6 +52,21 @@ function InventoryWidget(deps: { inventory: Inventory }) {
   return (
     <div className="inventory window">
       <h4>Inventory</h4>
+      <div>capacity: {unaryStr(character.storageCapacity())}</div>
+      {elems}
+    </div>
+  );
+}
+
+function SkillsWidget(deps: { learnedSkills: Skill[] }) {
+  const { learnedSkills } = deps;
+  const elems = Object.values(Skill).map((s) => {
+    const tags = ["skill"].concat(learnedSkills.includes(s) ? ["learned"] : []);
+    return <div className={tags.join(" ")}>{s}</div>;
+  });
+  return (
+    <div className="skills window">
+      <h4>Skills</h4>
       {elems}
     </div>
   );
@@ -122,7 +139,8 @@ export default function Game() {
             <LostPagesWidget
               lostPagesGenerator={gameState.lostPagesGenerator}
             />
-            <InventoryWidget inventory={gameState.character.inventory} />
+            <InventoryWidget character={gameState.character} />
+            <SkillsWidget learnedSkills={gameState.character.skills} />
           </div>
         )}
       </div>
