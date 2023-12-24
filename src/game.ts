@@ -226,19 +226,33 @@ export namespace LostPagesGenerator {
     prompt: Prompt<RngContext>,
     rng: IInput<RngContext>,
     generator: LostPagesGenerator
-  ): Promise<{ lostPage: LostPage; generator: LostPagesGenerator }> {
+  ): Promise<
+    Either<
+      "nothing left in the generator",
+      { lostPage: LostPage; generator: LostPagesGenerator }
+    >
+  > {
+    if (generator.wheel.length === 0) {
+      return left("nothing left in the generator");
+    }
     const shift = await rng.chooseFromRange(prompt, 0, 5);
     const idx = (generator.pos + shift) % generator.wheel.length;
-    return {
+    return right({
       lostPage: generator.wheel[idx]!,
       generator: {
         wheel: [
           ...generator.wheel.slice(0, idx),
           ...generator.wheel.slice(idx + 1),
         ],
-        pos: idx,
+        pos: evalThunk(() => {
+          if (generator.wheel.length > 1) {
+            return idx % (generator.wheel.length - 1);
+          } else {
+            return 0;
+          }
+        }),
       },
-    };
+    });
   }
 }
 
@@ -263,7 +277,7 @@ export namespace Village {
     input: { village: Village; lostPagesGenerator: LostPagesGenerator }
   ): Promise<
     Either<
-      "nothing to reveal",
+      "nothing to reveal" | "nothing left in the generator",
       {
         village: Village;
         lostPagesGenerator: LostPagesGenerator;
@@ -274,19 +288,25 @@ export namespace Village {
     if (village.pages.length != 0) {
       return left("nothing to reveal");
     }
-    const { lostPage, generator: newLostPagesGenerator } =
-      await LostPagesGenerator.generate(prompt, rng, lostPagesGenerator);
+    const generationResult = await LostPagesGenerator.generate(
+      prompt,
+      rng,
+      lostPagesGenerator
+    );
+    if (generationResult._tag === "Left") {
+      return left(generationResult.left);
+    }
     return right({
       village: {
         pages: [
           {
-            page: lostPage,
+            page: generationResult.right.lostPage,
             cost: 1,
             purchased: false,
           },
         ],
       },
-      lostPagesGenerator: newLostPagesGenerator,
+      lostPagesGenerator: generationResult.right.generator,
     });
   }
 
@@ -300,7 +320,9 @@ export namespace Village {
     }
   ): Promise<
     Either<
-      "nothing to purchase" | "not enough resources",
+      | "nothing to purchase"
+      | "not enough resources"
+      | "nothing left in the generator",
       {
         inventory: Inventory;
         village: Village;
@@ -328,17 +350,20 @@ export namespace Village {
     };
     var newLostPagesGenerator = lostPagesGenerator;
     if (village.pages.length < 2) {
-      const { lostPage, generator } = await LostPagesGenerator.generate(
+      const generationResult = await LostPagesGenerator.generate(
         prompt,
         rng,
         lostPagesGenerator
       );
+      if (generationResult._tag === "Left") {
+        return left(generationResult.left);
+      }
       newVillage.pages.push({
-        page: lostPage,
+        page: generationResult.right.lostPage,
         cost: village.pages.length + 1,
         purchased: false,
       });
-      newLostPagesGenerator = generator;
+      newLostPagesGenerator = generationResult.right.generator;
     }
     return right({
       inventory: {
