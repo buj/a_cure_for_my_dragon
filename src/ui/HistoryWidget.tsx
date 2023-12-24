@@ -81,7 +81,7 @@ function translateQuestionContext(q: QuestionContext): string {
     case "caveExit":
       return "Where do you want to exit the cave?";
     case "chooseAction":
-      return "Choose an action to do (move: right click, interact: left click).";
+      return "Choose an action to do (move: left click, interact: middle click).";
     case "interactWithMarket.trade":
       return "What do you want to trade for what?";
     case "interactWithMarket.tradeType":
