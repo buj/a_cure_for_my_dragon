@@ -6,7 +6,7 @@ import {
   Position,
   WorldObjectType,
 } from "../game";
-import { alchemyStr } from "./utils";
+import { alchemyStr, dialectStr } from "./utils";
 import { Question } from "./player";
 import { isPositionalQuestion } from "../protocol";
 import { evalThunk } from "../utils";
@@ -76,10 +76,10 @@ namespace BoardImpl {
             <text
               x={centerPixel.x}
               y={centerPixel.y}
-              dx={-hexRadius / 3}
-              dy={hexRadius / 3}
               opacity={opacity}
               fontSize={hexRadius}
+              textAnchor="middle"
+              dominantBaseline="middle"
             >
               {cell.object.data.turnNumber}
             </text>,
@@ -91,13 +91,47 @@ namespace BoardImpl {
             <text
               x={centerPixel.x}
               y={centerPixel.y}
-              dx={-hexRadius / 2}
-              dy={hexRadius / 3}
               fontSize={hexRadius}
+              textAnchor="middle"
+              dominantBaseline="middle"
             >
               {repr}
             </text>,
           ];
+        }
+        case WorldObjectType.Village: {
+          return [...cell.object.data.pages.entries()].map(([i, page]) => {
+            const dx = evalThunk(() => {
+              switch (i) {
+                case 0:
+                  return -hexRadius * 0.5;
+                case 1:
+                  return hexRadius * 0.65;
+                default:
+                  throw new Error(
+                    "a village with more than 2 pages is unsupported / not implemented"
+                  );
+              }
+            });
+            const x = centerPixel.x + dx;
+            return (
+              <text
+                x={x}
+                y={centerPixel.y - hexRadius / 3}
+                fontSize={hexRadius * 0.55}
+                className={
+                  page.purchased ? "purchasedVillagePage" : "villagePageForSale"
+                }
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                <tspan x={x}>{alchemyStr(page.page.cost)}</tspan>
+                <tspan x={x} dy={hexRadius * 0.666}>
+                  {dialectStr(page.page.dialect)}
+                </tspan>
+              </text>
+            );
+          });
         }
       }
       return [];
