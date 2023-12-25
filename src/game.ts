@@ -1880,7 +1880,10 @@ async function interactWithMarket(
       break;
     }
   }
-  const newCharacterState = game.state.character.tradeItems(trade.cost, trade.gain);
+  const newCharacterState = game.state.character.tradeItems(
+    trade.cost,
+    trade.gain
+  );
   if (newCharacterState._tag === "Left") {
     return left({
       msg: "interaction with market failed",
@@ -1921,7 +1924,10 @@ async function interactWithMarlon(
     case MarlonInteractionType.RevealDialect: {
       const choices = [...game.state.recipes.entries()].flatMap(
         ([idx, recipe]) => {
-          if (recipe.dialect === null) {
+          if (
+            recipe.dialect === null &&
+            game.state.character.inventory.rubies >= recipe.rubiesCost
+          ) {
             const result: [number, Recipe0] = [idx, recipe];
             return [result];
           } else {
