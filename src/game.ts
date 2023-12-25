@@ -372,6 +372,11 @@ export namespace Village {
           ...inventory.alchemy,
           [currPage.page.cost]: playerNumResources - currPage.cost,
         },
+        rawPages: {
+          ...inventory.rawPages,
+          [currPage.page.dialect]:
+            inventory.rawPages[currPage.page.dialect] + 1,
+        },
       },
       village: newVillage,
       lostPagesGenerator: newLostPagesGenerator,
