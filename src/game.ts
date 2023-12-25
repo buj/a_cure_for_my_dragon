@@ -1087,28 +1087,9 @@ export class Character {
 
   public constructor(init?: CharacterState) {
     if (init === undefined) {
-      this.inventory = {
-        rubies: 4,
-        alchemy: {
-          Mushroom: 4,
-          Honey: 4,
-          Waterlily: 4,
-        },
-        rawPages: {
-          Bird: 0,
-          Dragonfly: 0,
-          Fish: 0,
-          Mouse: 0,
-        },
-        translatedPages: {
-          Bird: 4,
-          Dragonfly: 4,
-          Fish: 4,
-          Mouse: 4,
-        },
-      };
-      this.skills = [Skill.Negotiation, Skill.Spelunking];
-      this.artifacts = [Artifact.GoldenDie];
+      this.inventory = Inventory.createInitial();
+      this.skills = [];
+      this.artifacts = [];
     } else {
       this.inventory = init.inventory;
       this.skills = init.skills;
