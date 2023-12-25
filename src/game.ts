@@ -1807,9 +1807,9 @@ export const zTrade = z.object({
 
 type Trade = z.infer<typeof zTrade>;
 
-async function interactWithMarket(
+async function interactWithMarketOnce(
   game: BootstrappedGame
-): Promise<GameActionResult<BootstrappedGame>> {
+): Promise<GameActionResult<BootstrappedGame | null>> {
   const tradeType = await game.player.chooseFromList(
     {
       context: "interactWithMarket.tradeType",
@@ -1819,8 +1819,12 @@ async function interactWithMarket(
       MarketTradeType.GoodForGood,
       MarketTradeType.RubyForGoods,
       MarketTradeType.GoodsForRuby,
+      null,
     ]
   );
+  if (tradeType === null) {
+    return right(null);
+  }
   const prompt2 = {
     context: "interactWithMarket.trade",
     key: JSON.stringify([game.promptNumber, 1]),
@@ -1829,7 +1833,7 @@ async function interactWithMarket(
   var trade: Trade;
   switch (tradeType) {
     case MarketTradeType.GoodForGood: {
-      trade = await game.player.chooseFromList(prompt2, [
+      const cands = [
         { cost: { alchemy: { Mushroom: 1 } }, gain: { alchemy: { Honey: 1 } } },
         {
           cost: { alchemy: { Mushroom: 1 } },
@@ -1848,11 +1852,16 @@ async function interactWithMarket(
           cost: { alchemy: { Waterlily: 1 } },
           gain: { alchemy: { Mushroom: 1 } },
         },
-      ]);
+      ].filter(
+        (trade) =>
+          game.state.character.tradeItems(trade.cost, trade.gain)._tag ===
+          "Right"
+      );
+      trade = await game.player.chooseFromList(prompt2, cands);
       break;
     }
     case MarketTradeType.RubyForGoods: {
-      trade = await game.player.chooseFromList(prompt2, [
+      const cands = [
         { cost: { rubies: 1 }, gain: { alchemy: { Honey: 2 } } },
         { cost: { rubies: 1 }, gain: { alchemy: { Mushroom: 2 } } },
         { cost: { rubies: 1 }, gain: { alchemy: { Waterlily: 2 } } },
@@ -1862,11 +1871,16 @@ async function interactWithMarket(
           cost: { rubies: 1 },
           gain: { alchemy: { Mushroom: 1, Waterlily: 1 } },
         },
-      ]);
+      ].filter(
+        (trade) =>
+          game.state.character.tradeItems(trade.cost, trade.gain)._tag ===
+          "Right"
+      );
+      trade = await game.player.chooseFromList(prompt2, cands);
       break;
     }
     case MarketTradeType.GoodsForRuby: {
-      trade = await game.player.chooseFromList(prompt2, [
+      const cands = [
         { cost: { alchemy: { Honey: 2 } }, gain: { rubies: 1 } },
         { cost: { alchemy: { Mushroom: 2 } }, gain: { rubies: 1 } },
         { cost: { alchemy: { Waterlily: 2 } }, gain: { rubies: 1 } },
@@ -1876,7 +1890,12 @@ async function interactWithMarket(
           cost: { alchemy: { Mushroom: 1, Waterlily: 1 } },
           gain: { rubies: 1 },
         },
-      ]);
+      ].filter(
+        (trade) =>
+          game.state.character.tradeItems(trade.cost, trade.gain)._tag ===
+          "Right"
+      );
+      trade = await game.player.chooseFromList(prompt2, cands);
       break;
     }
   }
@@ -1906,9 +1925,9 @@ export enum MarlonInteractionType {
   GiveIngredients = "GiveIngredients",
 }
 
-async function interactWithMarlon(
+async function interactWithMarlonOnce(
   game: BootstrappedGame
-): Promise<GameActionResult<BootstrappedGame>> {
+): Promise<GameActionResult<BootstrappedGame | null>> {
   const interactionType = await game.player.chooseFromList(
     {
       context: "interactWithMarlon.type",
@@ -1918,9 +1937,13 @@ async function interactWithMarlon(
       MarlonInteractionType.RevealDialect,
       MarlonInteractionType.RevealIngredients,
       MarlonInteractionType.GiveIngredients,
+      null,
     ]
   );
   switch (interactionType) {
+    case null: {
+      return right(null);
+    }
     case MarlonInteractionType.RevealDialect: {
       const choices = [...game.state.recipes.entries()].flatMap(
         ([idx, recipe]) => {
@@ -1940,13 +1963,17 @@ async function interactWithMarlon(
           msg: "there are no recipes with unknown dialects",
         });
       }
-      const [idx, recipe] = await game.player.chooseFromList(
+      const choice = await game.player.chooseFromList(
         {
           context: "interactWithMarlon.revealDialect.whichRecipe",
           key: JSON.stringify([game.promptNumber, 1]),
         },
-        choices
+        [...choices, null]
       );
+      if (choice === null) {
+        return right(null);
+      }
+      const [idx, recipe] = choice;
       const result = await RecipeGenerator.generate(
         JSON.stringify([game.promptNumber, 2]),
         game.rng(),
@@ -1985,19 +2012,27 @@ async function interactWithMarlon(
         ([idx, recipe]) => {
           if (recipe.dialect !== null && !("ingredients" in recipe)) {
             const result: [number, Recipe1] = [idx, recipe];
-            return [result];
-          } else {
-            return [];
+            if (
+              game.state.character.inventory.translatedPages[recipe.dialect] >=
+              recipe.numPages
+            ) {
+              return [result];
+            }
           }
+          return [];
         }
       );
-      const [idx, recipe] = await game.player.chooseFromList(
+      const choice = await game.player.chooseFromList(
         {
           context: "interactWithMarlon.revealIngredients.whichRecipe",
           key: JSON.stringify([game.promptNumber, 1]),
         },
-        choices
+        [...choices, null]
       );
+      if (choice === null) {
+        return right(null);
+      }
+      const [idx, recipe] = choice;
       const result = await RecipeGenerator.generate(
         JSON.stringify([game.promptNumber, 2]),
         game.rng(),
@@ -2095,9 +2130,9 @@ async function interactWithMarlon(
   }
 }
 
-async function interactWithMerchant(
+async function interactWithMerchantOnce(
   game: BootstrappedGame
-): Promise<GameActionResult<BootstrappedGame>> {
+): Promise<GameActionResult<BootstrappedGame | null>> {
   if (!game.state.character.skills.includes(Skill.Negotiation)) {
     return left({
       msg: "interaction with merchant requires the Negotiation skill",
@@ -2122,8 +2157,11 @@ async function interactWithMerchant(
       context: "interactWithMerchant.tradeWhat",
       key: JSON.stringify([game.promptNumber, 0]),
     },
-    [...choices.values()]
+    [...choices.values(), null]
   );
+  if (tradeWhat === null) {
+    return right(null);
+  }
   const tradeFor = await game.player.chooseFromList(
     {
       context: "interactWithMerchant.tradeFor",
@@ -2133,6 +2171,9 @@ async function interactWithMerchant(
       (d) => d != tradeWhat
     )
   );
+  if (tradeFor === null) {
+    return right(null);
+  }
   const cost: InventoryOpt =
     game.state.character.inventory.rawPages[tradeWhat] > 0
       ? { rawPages: { [tradeWhat]: 1 } }
@@ -2228,64 +2269,113 @@ async function interactWithSage(
   );
 }
 
+function afterSingleAction(
+  gameResult: GameActionResult<BootstrappedGame>
+): GameActionResult<BootstrappedGame> {
+  if (gameResult._tag === "Left") {
+    return gameResult;
+  }
+  return right(gameResult.right.advancePromptNumber());
+}
+
+async function repeatedInteraction(
+  interactOnce: (
+    game: BootstrappedGame
+  ) => Promise<GameActionResult<BootstrappedGame | null>>,
+  game: BootstrappedGame,
+  errorHandler: (e: GameActionError) => void
+): Promise<BootstrappedGame> {
+  while (true) {
+    const game2 = await interactOnce(game);
+    if (game2._tag === "Left") {
+      errorHandler(game2.left);
+      return game;
+    }
+    if (game2.right === null) {
+      return game;
+    }
+    game = game2.right.advancePromptNumber();
+    game.player.show(
+      {
+        context: "gameState",
+        key: JSON.stringify(game.promptNumber),
+      },
+      game.state
+    );
+  }
+}
+
 async function takeAction(
   action: GameAction,
-  game: BootstrappedGame
+  game: BootstrappedGame,
+  errorHandler: (e: GameActionError) => void
 ): Promise<GameActionResult<BootstrappedGame>> {
-  const afterAction = await evalThunk(async () => {
-    switch (action.type) {
-      case GameActionType.Move:
-        return moveAction(action.target, game);
-      case GameActionType.Interact: {
-        if (!Position.areAdjacent(action.target, game.state.charPos)) {
+  switch (action.type) {
+    case GameActionType.Move:
+      return moveAction(action.target, game);
+    case GameActionType.Interact: {
+      if (!Position.areAdjacent(action.target, game.state.charPos)) {
+        return left({
+          msg: "can interact only with adjacent cells",
+        });
+      }
+      const cell = game.state.world.get(action.target);
+      if (cell === null) {
+        return left({
+          msg: "cannot interact with cell that is out of bounds",
+        });
+      }
+      if (cell.object === undefined) {
+        return buildProductionBuilding(action.target, cell, game);
+      }
+      switch (cell.object.type) {
+        case WorldObjectType.Cave:
+          return enterCave(action.target, game);
+        case WorldObjectType.Market:
+          return right(
+            await repeatedInteraction(
+              interactWithMarketOnce,
+              game,
+              errorHandler
+            )
+          );
+        case WorldObjectType.Marlon:
+          return right(
+            await repeatedInteraction(
+              interactWithMarlonOnce,
+              game,
+              errorHandler
+            )
+          );
+        case WorldObjectType.Merchant:
+          return right(
+            await repeatedInteraction(
+              interactWithMerchantOnce,
+              game,
+              errorHandler
+            )
+          );
+        case WorldObjectType.Portal:
+          return interactWithPortal(action.target, game);
+        case WorldObjectType.ProductionBuilding:
+          return interactWithProductionBuilding(
+            cell.object.data.produces,
+            game
+          );
+        case WorldObjectType.Sage:
+          return interactWithSage(cell.object.data.id, game);
+        case WorldObjectType.Village:
+          return interactWithVillage(action.target, cell, game);
+        default:
           return left({
-            msg: "can interact only with adjacent cells",
+            msg: "no interaction to be had there",
+            data: {
+              cell,
+            },
           });
-        }
-        const cell = game.state.world.get(action.target);
-        if (cell === null) {
-          return left({
-            msg: "cannot interact with cell that is out of bounds",
-          });
-        }
-        if (cell.object === undefined) {
-          return buildProductionBuilding(action.target, cell, game);
-        }
-        switch (cell.object.type) {
-          case WorldObjectType.Cave:
-            return enterCave(action.target, game);
-          case WorldObjectType.Market:
-            return interactWithMarket(game);
-          case WorldObjectType.Marlon:
-            return interactWithMarlon(game);
-          case WorldObjectType.Merchant:
-            return interactWithMerchant(game);
-          case WorldObjectType.Portal:
-            return interactWithPortal(action.target, game);
-          case WorldObjectType.ProductionBuilding:
-            return interactWithProductionBuilding(
-              cell.object.data.produces,
-              game
-            );
-          case WorldObjectType.Sage:
-            return interactWithSage(cell.object.data.id, game);
-          case WorldObjectType.Village:
-            return interactWithVillage(action.target, cell, game);
-          default:
-            return left({
-              msg: "no interaction to be had there",
-              data: {
-                cell,
-              },
-            });
-        }
       }
     }
-  });
-  if (afterAction._tag === "Left") {
-    return afterAction;
   }
-  return right(afterAction.right.advancePromptNumber());
 }
 
 export async function runGame(
@@ -2325,14 +2415,18 @@ export async function runGame(
       },
       [...possibleMoves, ...possibleInteractions]
     );
-    const game2 = await takeAction(action, game.advancePromptNumber());
+    const game2 = await takeAction(
+      action,
+      game.advancePromptNumber(),
+      errorHandler
+    );
     switch (game2._tag) {
       case "Left": {
         errorHandler(game2.left);
         break;
       }
       case "Right": {
-        game = game2.right;
+        game = game2.right.advancePromptNumber();
         break;
       }
     }
