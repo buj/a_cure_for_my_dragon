@@ -1,4 +1,12 @@
-import { AlchemicalResource, Dialect, InventoryOpt } from "../game";
+import {
+  AlchemicalResource,
+  Dialect,
+  GameAction,
+  InventoryOpt,
+  Position,
+} from "../game";
+import { isPositionalQuestion } from "../protocol";
+import { Question } from "./player";
 
 export function dialectStr(d: string): string {
   switch (d) {
@@ -61,4 +69,26 @@ export function inventoryOptToString(x: InventoryOpt): string {
     }
   }
   return JSON.stringify(tmp);
+}
+
+export function extractPositionChoicesFromQuestion(q: Question): Position[] {
+  if (!isPositionalQuestion(q.prompt.context)) {
+    return [];
+  }
+  if (q.query.type !== "chooseFromList") {
+    throw new Error("positional question but query is not a list");
+  }
+  if (q.prompt.context === "chooseAction") {
+    const posListDuplicates = q.query.ls.map((x) => (x as GameAction).target);
+    const dedupDict: Record<string, Position> = {};
+    for (const pos of posListDuplicates) {
+      const key = JSON.stringify([pos.x, pos.y]);
+      if (key in dedupDict) {
+        continue;
+      }
+      dedupDict[key] = pos;
+    }
+    return Object.values(dedupDict);
+  }
+  return q.query.ls.map((x) => x as Position);
 }

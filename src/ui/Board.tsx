@@ -6,7 +6,11 @@ import {
   Position,
   WorldObjectType,
 } from "../game";
-import { alchemyStr, dialectStr } from "./utils";
+import {
+  alchemyStr,
+  dialectStr,
+  extractPositionChoicesFromQuestion,
+} from "./utils";
 import { Question } from "./player";
 import { isPositionalQuestion } from "../protocol";
 import { evalThunk } from "../utils";
@@ -60,6 +64,22 @@ namespace BoardImpl {
       svgElem.getScreenCTM()!.inverse()
     );
     return new Vector2d(transformedPoint.x, transformedPoint.y);
+  }
+
+  export function highlightChoices(q: Question) {
+    const positions = extractPositionChoicesFromQuestion(q);
+    return positions.map((pos) => {
+      const centerPixel = getCenterPixelForPos(pos);
+      return (
+        <circle
+          r={BoardImpl.hexRadius * 0.666}
+          fill="#008800"
+          opacity="0.3333"
+          cx={centerPixel.x}
+          cy={centerPixel.y}
+        />
+      );
+    });
   }
 
   export function worldElements(state: GameState) {
@@ -199,29 +219,13 @@ namespace BoardImpl {
     svgRef: React.RefObject<SVGSVGElement>,
     cursorRef: React.RefObject<SVGCircleElement>
   ) {
-    if (!isPositionalQuestion(q.prompt.context)) {
-      return;
-    }
-    if (q.query.type !== "chooseFromList") {
-      throw new Error("positional question but query is not a list");
-    }
+    const questionChoices = extractPositionChoicesFromQuestion(q);
     const pixel = computeSvgViewboxCoordsOfEvent(svgRef, event);
     const pos = getPosForPixel(pixel);
-
-    var matched: boolean;
-    if (q.prompt.context === "chooseAction") {
-      const matches = [
-        ...q.query.ls.map((x) => x as GameAction).entries(),
-      ].filter(
-        ([_, action]) => action.target.x === pos.x && action.target.y === pos.y
-      );
-      matched = matches.length > 0;
-    } else {
-      const matches = [
-        ...q.query.ls.map((x) => x as Position).entries(),
-      ].filter(([_, { x, y }]) => x === pos.x && y === pos.y);
-      matched = matches.length > 0;
-    }
+    const matched =
+      [...questionChoices.entries()].filter(
+        ([_, cand]) => cand.x === pos.x && cand.y === pos.y
+      ).length > 0;
 
     const cursor = cursorRef.current!;
     if (matched) {
@@ -276,6 +280,7 @@ export default function Board(deps: {
         stroke="#008800"
       />
       {gameState && BoardImpl.worldElements(gameState)}
+      {question !== null && BoardImpl.highlightChoices(question)}
     </svg>
   );
 }
