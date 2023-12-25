@@ -1,6 +1,6 @@
 import React from "react";
 import { LostPage, LostPagesGenerator } from "../game";
-import { alchemyStr, dialectStr } from "./utils";
+import { alchemyStr, dialectStr, lostPageStr } from "./utils";
 
 function LostPageWidget(rolls: number[], page: LostPage) {
   return (
@@ -9,8 +9,7 @@ function LostPageWidget(rolls: number[], page: LostPage) {
         .concat(rolls.length > 0 ? ["rollable"] : [])
         .join(" ")}
     >
-      {rolls.map((x) => x.toString()).join("")} [{alchemyStr(page.cost)}→
-      {dialectStr(page.dialect)}]
+      {rolls.map((x) => x.toString()).join("")} {lostPageStr(page)}
     </div>
   );
 }

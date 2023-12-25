@@ -1,5 +1,4 @@
 import { Either, left, right } from "fp-ts/lib/Either";
-import * as E from "fp-ts/lib/Either";
 import {
   ControlledInput,
   IInput,
@@ -10,6 +9,7 @@ import {
 } from "./entities";
 import { QuestionContext, RngContext, ShowContext } from "./protocol";
 import { evalThunk } from "./utils";
+import { z } from "zod";
 
 export enum AlchemicalResource {
   Mushroom = "Mushroom",
@@ -17,12 +17,16 @@ export enum AlchemicalResource {
   Waterlily = "Waterlily",
 }
 
+export const zAlchemicalResource = z.nativeEnum(AlchemicalResource);
+
 export enum Dialect {
   Dragonfly = "Dragonfly",
   Mouse = "Mouse",
   Fish = "Fish",
   Bird = "Bird",
 }
+
+export const zDialect = z.nativeEnum(Dialect);
 
 export type Inventory = {
   rubies: number;
@@ -37,18 +41,14 @@ export type Inventory = {
   };
 };
 
-export type InventoryOpt = {
-  rubies?: number;
-  alchemy?: {
-    [key in AlchemicalResource]?: number;
-  };
-  rawPages?: {
-    [key in Dialect]?: number;
-  };
-  translatedPages?: {
-    [key in Dialect]?: number;
-  };
-};
+export const zInventoryOpt = z.object({
+  rubies: z.number().optional(),
+  alchemy: z.record(zAlchemicalResource, z.number()).optional(),
+  rawPages: z.record(zDialect, z.number()).optional(),
+  translatedPages: z.record(zDialect, z.number()).optional(),
+});
+
+export type InventoryOpt = z.infer<typeof zInventoryOpt>;
 
 export namespace Inventory {
   export function createInitial(): Inventory {
@@ -189,16 +189,22 @@ export enum Skill {
   Mountaineering = "Mountaineering",
 }
 
+export const zSkill = z.nativeEnum(Skill);
+
 export enum Artifact {
   LeatherBackpack = "LeatherBackpack",
   PortalStone = "PortalStone",
   GoldenDie = "GoldenDie",
 }
 
-export type LostPage = {
-  dialect: Dialect;
-  cost: AlchemicalResource;
-};
+export const zArtifact = z.nativeEnum(Artifact);
+
+export const zLostPage = z.object({
+  dialect: zDialect,
+  cost: zAlchemicalResource,
+});
+
+export type LostPage = z.infer<typeof zLostPage>;
 
 export type LostPagesGenerator = {
   wheel: LostPage[];
@@ -1101,7 +1107,7 @@ export class Character {
           Mouse: 4,
         },
       };
-      this.skills = [];
+      this.skills = [Skill.Negotiation, Skill.Spelunking];
       this.artifacts = [Artifact.GoldenDie];
     } else {
       this.inventory = init.inventory;
@@ -1794,6 +1800,13 @@ export enum MarketTradeType {
   GoodsForRuby = "GoodsForRuby",
 }
 
+export const zTrade = z.object({
+  cost: zInventoryOpt,
+  gain: zInventoryOpt,
+});
+
+type Trade = z.infer<typeof zTrade>;
+
 async function interactWithMarket(
   game: BootstrappedGame
 ): Promise<GameActionResult<BootstrappedGame>> {
@@ -1813,44 +1826,61 @@ async function interactWithMarket(
     key: JSON.stringify([game.promptNumber, 1]),
   } as const;
 
-  var lhs: InventoryOpt;
-  var rhs: InventoryOpt;
+  var trade: Trade;
   switch (tradeType) {
     case MarketTradeType.GoodForGood: {
-      [lhs, rhs] = await game.player.chooseFromList(prompt2, [
-        [{ alchemy: { Mushroom: 1 } }, { alchemy: { Honey: 1 } }],
-        [{ alchemy: { Mushroom: 1 } }, { alchemy: { Waterlily: 1 } }],
-        [{ alchemy: { Honey: 1 } }, { alchemy: { Mushroom: 1 } }],
-        [{ alchemy: { Honey: 1 } }, { alchemy: { Waterlily: 1 } }],
-        [{ alchemy: { Waterlily: 1 } }, { alchemy: { Honey: 1 } }],
-        [{ alchemy: { Waterlily: 1 } }, { alchemy: { Mushroom: 1 } }],
+      trade = await game.player.chooseFromList(prompt2, [
+        { cost: { alchemy: { Mushroom: 1 } }, gain: { alchemy: { Honey: 1 } } },
+        {
+          cost: { alchemy: { Mushroom: 1 } },
+          gain: { alchemy: { Waterlily: 1 } },
+        },
+        { cost: { alchemy: { Honey: 1 } }, gain: { alchemy: { Mushroom: 1 } } },
+        {
+          cost: { alchemy: { Honey: 1 } },
+          gain: { alchemy: { Waterlily: 1 } },
+        },
+        {
+          cost: { alchemy: { Waterlily: 1 } },
+          gain: { alchemy: { Honey: 1 } },
+        },
+        {
+          cost: { alchemy: { Waterlily: 1 } },
+          gain: { alchemy: { Mushroom: 1 } },
+        },
       ]);
       break;
     }
     case MarketTradeType.RubyForGoods: {
-      [lhs, rhs] = await game.player.chooseFromList(prompt2, [
-        [{ rubies: 1 }, { alchemy: { Honey: 2 } }],
-        [{ rubies: 1 }, { alchemy: { Mushroom: 2 } }],
-        [{ rubies: 1 }, { alchemy: { Waterlily: 2 } }],
-        [{ rubies: 1 }, { alchemy: { Honey: 1, Mushroom: 1 } }],
-        [{ rubies: 1 }, { alchemy: { Honey: 1, Waterlily: 1 } }],
-        [{ rubies: 1 }, { alchemy: { Mushroom: 1, Waterlily: 1 } }],
+      trade = await game.player.chooseFromList(prompt2, [
+        { cost: { rubies: 1 }, gain: { alchemy: { Honey: 2 } } },
+        { cost: { rubies: 1 }, gain: { alchemy: { Mushroom: 2 } } },
+        { cost: { rubies: 1 }, gain: { alchemy: { Waterlily: 2 } } },
+        { cost: { rubies: 1 }, gain: { alchemy: { Honey: 1, Mushroom: 1 } } },
+        { cost: { rubies: 1 }, gain: { alchemy: { Honey: 1, Waterlily: 1 } } },
+        {
+          cost: { rubies: 1 },
+          gain: { alchemy: { Mushroom: 1, Waterlily: 1 } },
+        },
       ]);
       break;
     }
     case MarketTradeType.GoodsForRuby: {
-      [lhs, rhs] = await game.player.chooseFromList(prompt2, [
-        [{ alchemy: { Honey: 2 } }, { rubies: 1 }],
-        [{ alchemy: { Mushroom: 2 } }, { rubies: 1 }],
-        [{ alchemy: { Waterlily: 2 } }, { rubies: 1 }],
-        [{ alchemy: { Honey: 1, Mushroom: 1 } }, { rubies: 1 }],
-        [{ alchemy: { Honey: 1, Waterlily: 1 } }, { rubies: 1 }],
-        [{ alchemy: { Mushroom: 1, Waterlily: 1 } }, { rubies: 1 }],
+      trade = await game.player.chooseFromList(prompt2, [
+        { cost: { alchemy: { Honey: 2 } }, gain: { rubies: 1 } },
+        { cost: { alchemy: { Mushroom: 2 } }, gain: { rubies: 1 } },
+        { cost: { alchemy: { Waterlily: 2 } }, gain: { rubies: 1 } },
+        { cost: { alchemy: { Honey: 1, Mushroom: 1 } }, gain: { rubies: 1 } },
+        { cost: { alchemy: { Honey: 1, Waterlily: 1 } }, gain: { rubies: 1 } },
+        {
+          cost: { alchemy: { Mushroom: 1, Waterlily: 1 } },
+          gain: { rubies: 1 },
+        },
       ]);
       break;
     }
   }
-  const newCharacterState = game.state.character.tradeItems(lhs, rhs);
+  const newCharacterState = game.state.character.tradeItems(trade.cost, trade.gain);
   if (newCharacterState._tag === "Left") {
     return left({
       msg: "interaction with market failed",

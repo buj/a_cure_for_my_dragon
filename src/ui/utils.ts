@@ -3,7 +3,13 @@ import {
   Dialect,
   GameAction,
   InventoryOpt,
+  LostPage,
   Position,
+  zAlchemicalResource,
+  zDialect,
+  zInventoryOpt,
+  zLostPage,
+  zTrade,
 } from "../game";
 import { isPositionalQuestion } from "../protocol";
 import { Question } from "./player";
@@ -36,6 +42,10 @@ export function alchemyStr(a: string): string {
   }
 }
 
+export function lostPageStr(page: LostPage): string {
+  return `[${alchemyStr(page.cost)}→${dialectStr(page.dialect)}]`;
+}
+
 export function unaryStr(n: number, unit: string = "☐"): string {
   return Array(n).fill(unit).flat().join("");
 }
@@ -51,24 +61,84 @@ export function progressBarStr(numerator: number, denominator: number): string {
 }
 
 export function inventoryOptToString(x: InventoryOpt): string {
-  const tmp: Record<string, string> = {};
+  const parts: string[] = [];
   if (x.rubies !== undefined) {
-    tmp["💎"] = unaryStr(x.rubies);
+    parts.push(unaryStr(x.rubies, "💎"));
   }
   if (x.alchemy !== undefined) {
     for (const key in x.alchemy) {
-      tmp[alchemyStr(key)] = unaryStr(x.alchemy[key as AlchemicalResource]!);
+      parts.push(
+        unaryStr(x.alchemy[key as AlchemicalResource]!, alchemyStr(key))
+      );
     }
   }
   for (const d in Dialect) {
     if (d in (x.rawPages ?? {}) || d in (x.translatedPages ?? {})) {
-      tmp[dialectStr(d)] = progressBarStr(
+      const rhs = progressBarStr(
         (x.rawPages ?? {})[d as Dialect] ?? 0,
         (x.translatedPages ?? {})[d as Dialect] ?? 0
       );
+      parts.push(`${dialectStr(d)}: ${rhs}`);
     }
   }
-  return JSON.stringify(tmp);
+  return `{${parts.join(", ")}}`;
+}
+
+export function visualizeUnknown(u: any): string {
+  {
+    const r = zAlchemicalResource.safeParse(u);
+    if (r.success) {
+      return alchemyStr(r.data);
+    }
+  }
+  {
+    const r = zDialect.safeParse(u);
+    if (r.success) {
+      return dialectStr(r.data);
+    }
+  }
+  {
+    const r = zLostPage.safeParse(u);
+    if (r.success) {
+      return lostPageStr(r.data);
+    }
+  }
+  {
+    const r = zInventoryOpt.safeParse(u);
+    if (r.success && Object.keys(r.data).length > 0) {
+      return inventoryOptToString(r.data);
+    }
+  }
+  {
+    const r = zTrade.safeParse(u);
+    if (r.success) {
+      return `${inventoryOptToString(r.data.cost)} → ${inventoryOptToString(
+        r.data.gain
+      )}`;
+    }
+  }
+  if (Array.isArray(u)) {
+    return `[${u.map(visualizeUnknown).join(", ")}]`;
+  }
+  if (u === null) {
+    return "null";
+  }
+  switch (typeof u) {
+    case "object": {
+      const parts: string[] = [];
+      for (const [key, value] of Object.entries(u)) {
+        parts.push(`${visualizeUnknown(key)}: ${visualizeUnknown(value)}`);
+      }
+      return `{${parts.join(", ")}}`;
+    }
+    case "string": {
+      return u;
+    }
+    case "number": {
+      return `${u}`;
+    }
+  }
+  return JSON.stringify(u);
 }
 
 export function extractPositionChoicesFromQuestion(q: Question): Position[] {

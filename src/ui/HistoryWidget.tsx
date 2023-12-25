@@ -2,7 +2,13 @@ import React from "react";
 import { QuestionContext, isPositionalQuestion } from "../protocol";
 import { PromiseState, evalThunk } from "../utils";
 import { Question, Show } from "./player";
-import { alchemyStr, dialectStr, inventoryOptToString } from "./utils";
+import {
+  alchemyStr,
+  dialectStr,
+  inventoryOptToString,
+  lostPageStr,
+  visualizeUnknown,
+} from "./utils";
 import {
   AlchemicalResource,
   GameState,
@@ -159,10 +165,10 @@ function DialogueEntryVisualization(d: DialogueEntry) {
             switch (d.data.query.type) {
               case "chooseFromList":
                 return (
-                  <div>{JSON.stringify(d.data.query.ls[answer.value])}</div>
+                  <div>{visualizeUnknown(d.data.query.ls[answer.value])}</div>
                 );
               case "chooseFromRange":
-                return <div>{JSON.stringify(answer.value)}</div>;
+                return <div>{answer.value}</div>;
             }
           }
           case PromiseState.Rejected:
@@ -179,7 +185,7 @@ function DialogueEntryVisualization(d: DialogueEntry) {
     case "show": {
       const content = evalThunk(() => {
         if (typeof d.data.prompt.context === "object") {
-          return `Rerolled to ${d.data.what}`;
+          return `Rerolled to ${visualizeUnknown(d.data.what)}`;
         }
         switch (d.data.prompt.context) {
           case "RecipeGenerator.generate.dialect": {
@@ -199,9 +205,7 @@ function DialogueEntryVisualization(d: DialogueEntry) {
           }
           case "interactWithVillage.revealPage": {
             const page = d.data.what as LostPage;
-            return `Village has page [${alchemyStr(page.cost)}→${dialectStr(
-              page.dialect
-            )}]`;
+            return `Village has page ${lostPageStr(page)}]`;
           }
           case "gameState": {
             return `Move ${(d.data.what as GameState).turnNumber}`;
@@ -267,7 +271,7 @@ function PendingQuestionChoices(deps: { question: Question }) {
         };
         return (
           <button key={idx} onClick={clickHandler}>
-            {JSON.stringify(option)}
+            {visualizeUnknown(option)}
           </button>
         );
       });
