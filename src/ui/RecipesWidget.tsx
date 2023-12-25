@@ -54,7 +54,7 @@ function RecipeGeneratorWidget(deps: { recipeGenerator: RecipeGenerator }) {
     .join(", ");
   const remainingIngredientCombinationsStr =
     recipeGenerator.ingredientsRemainingCombinations
-      .map((ls) => ls.map(alchemyStr).join())
+      .map((ls) => ls.map(alchemyStr).join(""))
       .join(", ");
   return (
     <div className="recipeGenerator">
