@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Artifact,
   GameAction,
   GameActionType,
   GameState,
@@ -41,6 +42,12 @@ namespace BoardImpl {
   const dx = new Vector2d(42.9375, 0);
   export const hexRadius = 21.5;
 
+  const artifactsPx = {
+    [Artifact.GoldenDie]: new Vector2d(975, 686),
+    [Artifact.LeatherBackpack]: new Vector2d(856, 686),
+    [Artifact.PortalStone]: new Vector2d(915, 686),
+  };
+
   function getCenterPixelForPos(pos: Position): Vector2d {
     return origin.add(dx.mul(pos.x).add(dy.mul(pos.y)));
   }
@@ -64,6 +71,23 @@ namespace BoardImpl {
       svgElem.getScreenCTM()!.inverse()
     );
     return new Vector2d(transformedPoint.x, transformedPoint.y);
+  }
+
+  export function obtainedArtifactsMarkers(artifacts: Artifact[]) {
+    return artifacts.map((a) => {
+      const px = artifactsPx[a];
+      return (
+        <text
+          x={px.x}
+          y={px.y}
+          fontSize={hexRadius}
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          ☑
+        </text>
+      );
+    });
   }
 
   export function highlightChoices(q: Question) {
@@ -279,7 +303,12 @@ export default function Board(deps: {
         stroke-width="3"
         stroke="#008800"
       />
-      {gameState && BoardImpl.worldElements(gameState)}
+      {gameState && (
+        <>
+          {BoardImpl.worldElements(gameState)}
+          {BoardImpl.obtainedArtifactsMarkers(gameState.character.artifacts)}
+        </>
+      )}
       {question !== null && BoardImpl.highlightChoices(question)}
     </svg>
   );
