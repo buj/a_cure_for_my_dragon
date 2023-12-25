@@ -115,6 +115,14 @@ export default function Game() {
     runGame(prng, player, setError);
   }, [setActiveQuestion, setGameState, setDialogueHistory]);
 
+  const historyContainerRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (historyContainerRef.current) {
+      historyContainerRef.current.scrollTop =
+        historyContainerRef.current.scrollHeight;
+    }
+  }, [dialogueHistory]);
+
   return (
     <div
       className="game"
@@ -122,6 +130,7 @@ export default function Game() {
     >
       <div style={{ display: "flex", overflowY: "clip", flexGrow: 1 }}>
         <div
+          ref={historyContainerRef}
           style={{
             width: "20%",
             height: "100%",

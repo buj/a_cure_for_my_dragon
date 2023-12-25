@@ -176,7 +176,7 @@ function DialogueEntryVisualization(d: DialogueEntry) {
         }
       });
       return (
-        <div key={`Q(${d.data.prompt.key})`} className="historyEntry window">
+        <div key={`Q(${d.data.prompt.key})`} className="historyEntry">
           <div>{`❓: ${questionText}`}</div>
           {answerElem}
         </div>
@@ -213,7 +213,7 @@ function DialogueEntryVisualization(d: DialogueEntry) {
         }
       });
       return (
-        <div key={`S(${d.data.prompt.key})`} className="historyEntry window">
+        <div key={`S(${d.data.prompt.key})`} className="historyEntry">
           💬: {content}
         </div>
       );
