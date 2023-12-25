@@ -1,4 +1,5 @@
 import { Either, left, right } from "fp-ts/lib/Either";
+import * as E from "fp-ts/lib/Either";
 import { ControlledInput, IInput, IPlayer, Prng, Prompt } from "./entities";
 import { QuestionContext, RngContext, ShowContext } from "./protocol";
 import { evalThunk } from "./utils";
@@ -641,12 +642,12 @@ const defaultWorld: Array<[string, string]> = [
   ["ff     c", "^   ff"],
   ["     m  ", " ^     "],
   ["        ", "        "],
-  ["p  3    ", "t   l   M"],
+  ["p  2    ", "t   l   M"],
   ["       ", "      V  "],
   ["V  l  ", "   m     "],
   ["     ", "c       0"],
   ["    ", " ^^      "],
-  ["0  ", "     2 l "],
+  ["0  ", "     3 l "],
   ["  ", "V        "],
   [" ", "   ff    "],
   ["", "M  fvf  p"],
@@ -819,6 +820,10 @@ export namespace WorldInit {
 export type Position = { y: number; x: number };
 
 export namespace Position {
+  export function areEqual(pos1: Position, pos2: Position): boolean {
+    return pos1.x === pos2.x && pos1.y === pos2.y;
+  }
+
   export function getAdjacents(pos: Position): Position[] {
     const { x, y } = pos;
     return [
@@ -1409,7 +1414,10 @@ async function enterCave(
   if (!game.state.character.skills.includes(Skill.Spelunking)) {
     return left({ msg: "skill Spelunking is required for entering the cave" });
   }
-  if (pos === game.state.lastVisitedCave) {
+  if (
+    game.state.lastVisitedCave !== undefined &&
+    Position.areEqual(pos, game.state.lastVisitedCave)
+  ) {
     return left({ msg: "cannot enter the cave that you visited last time" });
   }
   const cell = game.state.world.get(pos);
@@ -2083,7 +2091,7 @@ async function interactWithSage(
     null,
   ];
   const newCharacterStateResult = game.state.character.tradeItems(
-    { rawPages: { [translateWhat]: 1 } },
+    { rubies: 1, rawPages: { [translateWhat]: 1 } },
     { translatedPages: { [translateWhat]: 1 } }
   );
   if (newCharacterStateResult._tag === "Left") {
@@ -2091,20 +2099,25 @@ async function interactWithSage(
       msg: newCharacterStateResult.left,
     });
   }
-  const learnWhat =
-    learnableSkills.length > 1
-      ? await game.player.chooseFromList(
-          {
-            context: "interactWithSage.learnWhat",
-            key: JSON.stringify([game.promptNumber, 1]),
-          },
-          learnableSkills
-        )
-      : null;
-  var newCharacterState = newCharacterStateResult.right;
-  if (learnWhat !== null) {
-    newCharacterState = newCharacterStateResult.right.withSkill(learnWhat);
-  }
+  const afterAnotherRuby = newCharacterStateResult.right.tradeItems(
+    { rubies: 1 },
+    {}
+  );
+  const newCharacterState = await evalThunk(async () => {
+    if (learnableSkills.length > 1 && afterAnotherRuby._tag === "Right") {
+      const learnWhat = await game.player.chooseFromList(
+        {
+          context: "interactWithSage.learnWhat",
+          key: JSON.stringify([game.promptNumber, 1]),
+        },
+        learnableSkills
+      );
+      if (learnWhat !== null) {
+        return afterAnotherRuby.right.withSkill(learnWhat);
+      }
+    }
+    return newCharacterStateResult.right;
+  });
   return right(
     game.withState({
       ...game.state,
