@@ -1,11 +1,12 @@
 export type RngContext =
   | "RecipeGenerator.generate.dialect"
   | "RecipeGenerator.generate.ingredients"
+  | "RecipeGenerator.generate.ingredient1RequiredAmount"
+  | "RecipeGenerator.generate.ingredient2RequiredAmount"
   | "caveBarrel.1"
   | "caveBarrel.2"
   | "caveTreasure"
-  | "interactWithVillage.revealFirstPage"
-  | "interactWithVillage.afterPurchasePageReveal";
+  | "interactWithVillage.revealPage";
 
 export type QuestionContext =
   | "startGame.startPos"
@@ -27,7 +28,7 @@ export type QuestionContext =
   | "interactWithSage.translateWhat"
   | "interactWithSage.learnWhat"
   | "chooseAction"
-  | { keepOrReroll: RngContext };
+  | { keepOrReroll: RngContext; value: any };
 
 export type PositionalQuestionContext =
   | "caveExit"
@@ -56,7 +57,11 @@ export function isPositionalQuestion(
 }
 
 export type ShowContext =
+  | "RecipeGenerator.generate.dialect"
+  | "RecipeGenerator.generate.ingredients"
   | "caveBarrel.1"
   | "caveBarrel.2"
   | "caveTreasure"
-  | "gameState";
+  | "interactWithVillage.revealPage"
+  | "gameState"
+  | { reroll: RngContext };

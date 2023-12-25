@@ -1,6 +1,13 @@
 import { Either, left, right } from "fp-ts/lib/Either";
 import * as E from "fp-ts/lib/Either";
-import { ControlledInput, IInput, IPlayer, Prng, Prompt } from "./entities";
+import {
+  ControlledInput,
+  IInput,
+  IOutput,
+  IPlayer,
+  Prng,
+  Prompt,
+} from "./entities";
 import { QuestionContext, RngContext, ShowContext } from "./protocol";
 import { evalThunk } from "./utils";
 
@@ -273,8 +280,9 @@ export namespace Village {
   }
 
   export async function revealFirstPage(
-    prompt: Prompt<RngContext>,
+    promptKey: string,
     rng: IInput<RngContext>,
+    output: IOutput<ShowContext>,
     input: { village: Village; lostPagesGenerator: LostPagesGenerator }
   ): Promise<
     Either<
@@ -290,13 +298,23 @@ export namespace Village {
       return left("nothing to reveal");
     }
     const generationResult = await LostPagesGenerator.generate(
-      prompt,
+      {
+        context: "interactWithVillage.revealPage",
+        key: promptKey,
+      },
       rng,
       lostPagesGenerator
     );
     if (generationResult._tag === "Left") {
       return left(generationResult.left);
     }
+    output.show(
+      {
+        context: "interactWithVillage.revealPage",
+        key: promptKey,
+      },
+      generationResult.right.lostPage
+    );
     return right({
       village: {
         pages: [
@@ -312,8 +330,9 @@ export namespace Village {
   }
 
   export async function purchasePage(
-    prompt: Prompt<RngContext>,
+    promptKey: string,
     rng: IInput<RngContext>,
+    output: IOutput<ShowContext>,
     input: {
       inventory: Inventory;
       village: Village;
@@ -352,7 +371,10 @@ export namespace Village {
     var newLostPagesGenerator = lostPagesGenerator;
     if (village.pages.length < 2) {
       const generationResult = await LostPagesGenerator.generate(
-        prompt,
+        {
+          context: "interactWithVillage.revealPage",
+          key: promptKey,
+        },
         rng,
         lostPagesGenerator
       );
@@ -365,6 +387,13 @@ export namespace Village {
         purchased: false,
       });
       newLostPagesGenerator = generationResult.right.generator;
+      output.show(
+        {
+          context: "interactWithVillage.revealPage",
+          key: promptKey,
+        },
+        generationResult.right.lostPage
+      );
     }
     return right({
       inventory: {
@@ -459,7 +488,8 @@ export namespace Recipe {
           (recipe.ingredientsCollected[key as AlchemicalResource] ?? 0)
       );
       newInventory.alchemy[key as AlchemicalResource] -= ingredientContribution;
-      newRecipe.ingredientsCollected[key as AlchemicalResource]! +=
+      newRecipe.ingredientsCollected[key as AlchemicalResource] =
+        (newRecipe.ingredientsCollected[key as AlchemicalResource] ?? 0) +
         ingredientContribution;
     }
     if (isRecipe3WithAllIngredientsCollected(newRecipe)) {
@@ -508,6 +538,7 @@ export namespace RecipeGenerator {
   export async function generate(
     promptKey: string,
     rng: IInput<RngContext>,
+    output: IOutput<ShowContext>,
     input: {
       recipeGenerator: RecipeGenerator;
       recipe: Recipe;
@@ -523,16 +554,17 @@ export namespace RecipeGenerator {
   > {
     const { recipeGenerator, recipe } = input;
     if (recipe.dialect === null) {
-      const ctx: Prompt<RngContext> = {
+      const ctx = {
         context: "RecipeGenerator.generate.dialect",
         key: promptKey,
-      };
+      } as const;
       const { chosen: dialect, rest: remainingDialects } =
-        await IInput.chooseFromListWithoutReplacement(
+        await IInput.chooseFromListWithoutReplacement<Dialect, RngContext>(
           rng,
           ctx,
           recipeGenerator.remainingDialects
         );
+      output.show(ctx, dialect);
       return right({
         recipeGenerator: {
           ...recipeGenerator,
@@ -544,8 +576,11 @@ export namespace RecipeGenerator {
         },
       });
     } else if (!("ingredients" in recipe)) {
-      const { chosen: ingredientsCombo, rest: remainingIngredientsCombos } =
-        await IInput.chooseFromListWithoutReplacement(
+      const { chosen: ingredients, rest: remainingIngredientsCombos } =
+        await IInput.chooseFromListWithoutReplacement<
+          AlchemicalResource[],
+          RngContext
+        >(
           rng,
           {
             context: "RecipeGenerator.generate.ingredients",
@@ -553,25 +588,36 @@ export namespace RecipeGenerator {
           },
           recipeGenerator.ingredientsRemainingCombinations
         );
-      const [ingredient1, ingredient2] = ingredientsCombo;
       const { chosen: count1, rest: ingredientsRemainingCounts } =
-        await IInput.chooseFromListWithoutReplacement(
+        await IInput.chooseFromListWithoutReplacement<number, RngContext>(
           rng,
           {
-            context: "RecipeGenerator.generate.ingredients",
+            context: "RecipeGenerator.generate.ingredient1RequiredAmount",
             key: JSON.stringify([promptKey, 1]),
           },
           recipeGenerator.ingredientsRemainingCounts
         );
       const { chosen: count2, rest: ingredientsRemainingCounts2 } =
-        await IInput.chooseFromListWithoutReplacement(
+        await IInput.chooseFromListWithoutReplacement<number, RngContext>(
           rng,
           {
-            context: "RecipeGenerator.generate.ingredients",
+            context: "RecipeGenerator.generate.ingredient2RequiredAmount",
             key: JSON.stringify([promptKey, 2]),
           },
           ingredientsRemainingCounts
         );
+      output.show<InventoryOpt>(
+        {
+          context: "RecipeGenerator.generate.ingredients",
+          key: JSON.stringify([promptKey, [0, 1, 2]]),
+        },
+        {
+          alchemy: {
+            [ingredients[0]!]: count1,
+            [ingredients[1]!]: count2,
+          },
+        }
+      );
       return right({
         recipeGenerator: {
           ...recipeGenerator,
@@ -582,8 +628,8 @@ export namespace RecipeGenerator {
           dialect: recipe.dialect,
           numPages: recipe.numPages,
           ingredients: {
-            [ingredient1!]: count1,
-            [ingredient2!]: count2,
+            [ingredients[0]!]: count1,
+            [ingredients[1]!]: count2,
           },
           ingredientsCollected: {},
         },
@@ -1035,9 +1081,28 @@ export class Character {
 
   public constructor(init?: CharacterState) {
     if (init === undefined) {
-      this.inventory = Inventory.createInitial();
+      this.inventory = {
+        rubies: 2,
+        alchemy: {
+          Mushroom: 2,
+          Honey: 2,
+          Waterlily: 2,
+        },
+        rawPages: {
+          Bird: 0,
+          Dragonfly: 0,
+          Fish: 0,
+          Mouse: 0,
+        },
+        translatedPages: {
+          Bird: 4,
+          Dragonfly: 4,
+          Fish: 4,
+          Mouse: 4,
+        },
+      };
       this.skills = [];
-      this.artifacts = [];
+      this.artifacts = [Artifact.GoldenDie];
     } else {
       this.inventory = init.inventory;
       this.skills = init.skills;
@@ -1664,11 +1729,9 @@ async function interactWithVillage(
   const village = cell.object.data;
   if (village.pages.length === 0) {
     const afterReveal = await Village.revealFirstPage(
-      {
-        context: "interactWithVillage.revealFirstPage",
-        key: JSON.stringify(game.promptNumber),
-      },
+      JSON.stringify(game.promptNumber),
       game.rng(),
+      game.player,
       {
         village,
         lostPagesGenerator: game.state.lostPagesGenerator,
@@ -1693,11 +1756,9 @@ async function interactWithVillage(
     return right(game.withState(newState));
   } else {
     const afterPurchase = await Village.purchasePage(
-      {
-        context: "interactWithVillage.afterPurchasePageReveal",
-        key: JSON.stringify(game.promptNumber),
-      },
+      JSON.stringify(game.promptNumber),
       game.rng(),
+      game.player,
       {
         inventory: game.state.character.inventory,
         village,
@@ -1853,6 +1914,7 @@ async function interactWithMarlon(
       const result = await RecipeGenerator.generate(
         JSON.stringify([game.promptNumber, 2]),
         game.rng(),
+        game.player,
         {
           recipeGenerator: game.state.recipeGenerator,
           recipe,
@@ -1903,6 +1965,7 @@ async function interactWithMarlon(
       const result = await RecipeGenerator.generate(
         JSON.stringify([game.promptNumber, 2]),
         game.rng(),
+        game.player,
         {
           recipeGenerator: game.state.recipeGenerator,
           recipe,

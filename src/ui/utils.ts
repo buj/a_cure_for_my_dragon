@@ -19,7 +19,7 @@ export function dialectStr(d: string): string {
     case Dialect.Mouse:
       return "🐭";
     default:
-      return "?";
+      return `<unknown: ${d}>`;
   }
 }
 
@@ -32,7 +32,7 @@ export function alchemyStr(a: string): string {
     case AlchemicalResource.Waterlily:
       return "🌺";
     default:
-      return "?";
+      return `<unknown: ${a}>`;
   }
 }
 

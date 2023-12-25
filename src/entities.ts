@@ -20,9 +20,10 @@ export namespace IInput {
     chosen: T;
     rest: T[];
   }> {
-    const idx = await input.chooseFromRange(prompt, 0, ls.length - 1);
+    const value = await input.chooseFromList(prompt, ls);
+    const idx = ls.indexOf(value);
     return {
-      chosen: ls[idx]!,
+      chosen: value,
       rest: [...ls.slice(0, idx), ...ls.slice(idx + 1)],
     };
   }
@@ -62,15 +63,16 @@ export class RecordedInput<Q> implements IInput<Q> {
 export class ControlledInput<Q> implements IInput<Q> {
   public constructor(
     private source: IInput<Q>,
-    private controller: IInput<{ keepOrReroll: Q }>
+    private controller: IPlayer<{ keepOrReroll: Q; value: any }, { reroll: Q }>
   ) {}
 
-  public chooseFromRange = async (
+  chooseFromRangeMapped: <T>(
     prompt: Prompt<Q>,
     l: number,
-    r: number
-  ): Promise<number> => {
-    const srcChoice = this.source.chooseFromRange(
+    r: number,
+    mapping: (i: number) => T
+  ) => Promise<T> = async (prompt, l, r, mapping) => {
+    const srcChoice = await this.source.chooseFromRange(
       {
         context: prompt.context,
         key: JSON.stringify([prompt.key, 0]),
@@ -78,20 +80,19 @@ export class ControlledInput<Q> implements IInput<Q> {
       l,
       r
     );
-    const keep = await this.controller.chooseFromList(
+    const reroll = await this.controller.chooseFromList(
       {
         context: {
           keepOrReroll: prompt.context,
+          value: mapping(srcChoice),
         },
         key: prompt.key,
       },
       [false, true]
     );
 
-    if (keep) {
-      return srcChoice;
-    } else {
-      return this.source.chooseFromRange(
+    if (reroll) {
+      const rerolled = await this.source.chooseFromRange(
         {
           context: prompt.context,
           key: JSON.stringify([prompt.key, 1]),
@@ -99,12 +100,31 @@ export class ControlledInput<Q> implements IInput<Q> {
         l,
         r
       );
+      this.controller.show(
+        {
+          context: {
+            reroll: prompt.context,
+          },
+          key: prompt.key,
+        },
+        mapping(rerolled)
+      );
+      return mapping(rerolled);
+    } else {
+      return mapping(srcChoice);
     }
   };
 
+  public chooseFromRange = async (
+    prompt: Prompt<Q>,
+    l: number,
+    r: number
+  ): Promise<number> => {
+    return this.chooseFromRangeMapped(prompt, l, r, (i) => i);
+  };
+
   public chooseFromList = async <T>(prompt: Prompt<Q>, ls: T[]): Promise<T> => {
-    const idx = await this.chooseFromRange(prompt, 0, ls.length - 1);
-    return ls[idx]!;
+    return this.chooseFromRangeMapped(prompt, 0, ls.length - 1, (i) => ls[i]!);
   };
 }
 

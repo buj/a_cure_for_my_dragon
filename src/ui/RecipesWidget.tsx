@@ -29,7 +29,7 @@ function RecipeWidget(deps: { recipe: Recipe }) {
   if ("ingredientsCollected" in recipe) {
     lines = Object.keys(recipe.ingredients).map((key) => {
       const line = `${alchemyStr(key)} : ${progressBarStr(
-        recipe.ingredientsCollected[key as AlchemicalResource]!,
+        recipe.ingredientsCollected[key as AlchemicalResource] ?? 0,
         recipe.ingredients[key as AlchemicalResource]!
       )}`;
       return <div className="recipe.ingredient">{line}</div>;

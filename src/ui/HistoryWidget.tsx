@@ -2,8 +2,13 @@ import React from "react";
 import { QuestionContext, isPositionalQuestion } from "../protocol";
 import { PromiseState, evalThunk } from "../utils";
 import { Question, Show } from "./player";
-import { inventoryOptToString } from "./utils";
-import { GameState } from "../game";
+import { alchemyStr, dialectStr, inventoryOptToString } from "./utils";
+import {
+  AlchemicalResource,
+  GameState,
+  LostPage,
+  RecipeGenerator,
+} from "../game";
 
 type DialogueEntry =
   | {
@@ -62,17 +67,29 @@ function translateQuestionContext(q: QuestionContext): string {
   if (typeof q === "object") {
     switch (q.keepOrReroll) {
       case "RecipeGenerator.generate.dialect":
-        return "Do you want to reroll the generated recipe dialect?";
-      case "RecipeGenerator.generate.ingredients":
-        return "Do you want to reroll the generated recipe ingredients?";
+        return `Do you want to reroll the generated recipe dialect (${dialectStr(
+          q.value
+        )}) ?`;
+      case "RecipeGenerator.generate.ingredients": {
+        const ingredientsStr = (q.value as AlchemicalResource[])
+          .map(alchemyStr)
+          .join("");
+        return `Do you want to reroll the generated recipe ingredients (${ingredientsStr}) ?`;
+      }
+      case "RecipeGenerator.generate.ingredient1RequiredAmount":
+        return `Do you want to reroll ingredient 1 required amount (${q.value}) ?`;
+      case "RecipeGenerator.generate.ingredient2RequiredAmount":
+        return `Do you want to reroll ingredient 2 required amount (${q.value}) ?`;
       case "caveBarrel.1":
-      case "caveBarrel.2":
-        return "Do you want to reroll the loot from the barrel?";
+      case "caveBarrel.2": {
+        const lootStr = inventoryOptToString(q.value);
+        return `Do you want to reroll the loot from the barrel (${lootStr}) ?`;
+      }
       case "caveTreasure":
-        return "Do you want to reroll the treasure?";
-      case "interactWithVillage.afterPurchasePageReveal":
-      case "interactWithVillage.revealFirstPage":
-        return "Do you want to reroll the revealed village page?";
+        return `Do you want to reroll the treasure (${q.value}) ?`;
+      case "interactWithVillage.revealPage": {
+        return `Lost pages will advance ${q.value}, do you want to reroll?`;
+      }
     }
   }
   switch (q) {
@@ -153,7 +170,16 @@ function DialogueEntryVisualization(d: DialogueEntry) {
     }
     case "show": {
       const content = evalThunk(() => {
+        if (typeof d.data.prompt.context === "object") {
+          return `Rerolled to ${d.data.what}`;
+        }
         switch (d.data.prompt.context) {
+          case "RecipeGenerator.generate.dialect": {
+            return `Recipe has dialect ${dialectStr(d.data.what)}`;
+          }
+          case "RecipeGenerator.generate.ingredients": {
+            return `Recipe requires ${inventoryOptToString(d.data.what)}`;
+          }
           case "caveBarrel.1":
           case "caveBarrel.2": {
             return `You got the following resources: ${inventoryOptToString(
@@ -162,6 +188,12 @@ function DialogueEntryVisualization(d: DialogueEntry) {
           }
           case "caveTreasure": {
             return `You got the following treasure: ${d.data.what}`;
+          }
+          case "interactWithVillage.revealPage": {
+            const page = d.data.what as LostPage;
+            return `Village has page [${alchemyStr(page.cost)}→${dialectStr(
+              page.dialect
+            )}]`;
           }
           case "gameState": {
             return `Move ${(d.data.what as GameState).turnNumber}`;

@@ -1,4 +1,4 @@
-.lostPagesGeneratorPage:not(.current) {
+.lostPagesGeneratorPage:not(.rollable) {
   opacity: 0.5;
 }
 
