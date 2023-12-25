@@ -65,30 +65,40 @@ export class DialogueHistory {
 
 function translateQuestionContext(q: QuestionContext): string {
   if (typeof q === "object") {
-    switch (q.keepOrReroll) {
-      case "RecipeGenerator.generate.dialect":
-        return `Do you want to reroll the generated recipe dialect (${dialectStr(
-          q.value
-        )}) ?`;
-      case "RecipeGenerator.generate.ingredients": {
-        const ingredientsStr = (q.value as AlchemicalResource[])
-          .map(alchemyStr)
-          .join("");
-        return `Do you want to reroll the generated recipe ingredients (${ingredientsStr}) ?`;
+    switch (q.type) {
+      case "keepOrReroll": {
+        switch (q.rngCtx) {
+          case "RecipeGenerator.generate.dialect":
+            return `Do you want to reroll the generated recipe dialect (${dialectStr(
+              q.value
+            )}) ?`;
+          case "RecipeGenerator.generate.ingredients": {
+            const ingredientsStr = (q.value as AlchemicalResource[])
+              .map(alchemyStr)
+              .join("");
+            return `Do you want to reroll the generated recipe ingredients (${ingredientsStr}) ?`;
+          }
+          case "RecipeGenerator.generate.ingredient1RequiredAmount":
+            return `Do you want to reroll ingredient 1 required amount (${q.value}) ?`;
+          case "RecipeGenerator.generate.ingredient2RequiredAmount":
+            return `Do you want to reroll ingredient 2 required amount (${q.value}) ?`;
+          case "caveBarrel.1":
+          case "caveBarrel.2": {
+            const lootStr = inventoryOptToString(q.value);
+            return `Do you want to reroll the loot from the barrel (${lootStr}) ?`;
+          }
+          case "caveTreasure":
+            return `Do you want to reroll the treasure (${q.value}) ?`;
+          case "interactWithVillage.revealPage": {
+            return `Lost pages will advance ${q.value}, do you want to reroll?`;
+          }
+        }
+        throw new Error("unexpected, this should be unreachable");
       }
-      case "RecipeGenerator.generate.ingredient1RequiredAmount":
-        return `Do you want to reroll ingredient 1 required amount (${q.value}) ?`;
-      case "RecipeGenerator.generate.ingredient2RequiredAmount":
-        return `Do you want to reroll ingredient 2 required amount (${q.value}) ?`;
-      case "caveBarrel.1":
-      case "caveBarrel.2": {
-        const lootStr = inventoryOptToString(q.value);
-        return `Do you want to reroll the loot from the barrel (${lootStr}) ?`;
-      }
-      case "caveTreasure":
-        return `Do you want to reroll the treasure (${q.value}) ?`;
-      case "interactWithVillage.revealPage": {
-        return `Lost pages will advance ${q.value}, do you want to reroll?`;
+      case "interactWithMarlon.giveIngredients.ingredientsAmounts": {
+        return `How much ${alchemyStr(
+          q.ingredient
+        )} do you want to contribute?`;
       }
     }
   }
@@ -105,8 +115,6 @@ function translateQuestionContext(q: QuestionContext): string {
       return "What kind of trade?";
     case "interactWithMarlon.giveIngredients.whichRecipe":
       return "Which recipe do you want to contribute ingredients into?";
-    case "interactWithMarlon.giveIngredients.ingredientsAmounts":
-      return "How much do you want to contribute?";
     case "interactWithMarlon.revealDialect.whichRecipe":
       return "Which recipe's dialect do you want to reveal?";
     case "interactWithMarlon.revealIngredients.whichRecipe":

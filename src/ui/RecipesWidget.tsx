@@ -7,13 +7,14 @@ import {
 } from "../game";
 import { alchemyStr, dialectStr, progressBarStr } from "./utils";
 
-function RecipeWidget(deps: { recipe: Recipe }) {
-  const { recipe } = deps;
+function RecipeWidget(deps: { idx: number; recipe: Recipe }) {
+  const { idx, recipe } = deps;
   if (recipe.dialect === null) {
     const costStr = Array(recipe.rubiesCost).fill("💎").flat().join("");
     const numPagesStr = `[?]⨉${recipe.numPages}`;
     return (
-      <div className="recipe">
+      <div key={idx} className="recipe">
+        <h5>{idx}.</h5>
         {costStr} → {numPagesStr}
       </div>
     );
@@ -22,7 +23,12 @@ function RecipeWidget(deps: { recipe: Recipe }) {
     const numPagesStr: string = `[${dialectStr(recipe.dialect)}]⨉${
       recipe.numPages
     }`;
-    return <div className="recipe">{numPagesStr}</div>;
+    return (
+      <div key={idx} className="recipe">
+        <h5>{idx}.</h5>
+        {numPagesStr}
+      </div>
+    );
   }
 
   var lines;
@@ -41,7 +47,12 @@ function RecipeWidget(deps: { recipe: Recipe }) {
     });
     lines = [...lines, <div className="recipe.finished">finished!</div>];
   }
-  return <div className="recipe">{lines}</div>;
+  return (
+    <div key={idx} className="recipe">
+      <h5>{idx}.</h5>
+      {lines}
+    </div>
+  );
 }
 
 function RecipeGeneratorWidget(deps: { recipeGenerator: RecipeGenerator }) {
@@ -69,9 +80,9 @@ function RecipeGeneratorWidget(deps: { recipeGenerator: RecipeGenerator }) {
 
 export default function RecipesWidget(deps: { state: GameState }) {
   const { state } = deps;
-  const recipesWidgets = state.recipes.map((recipe) =>
-    RecipeWidget({ recipe })
-  );
+  const recipesWidgets = [...state.recipes.entries()].map(([idx, recipe]) => (
+    <RecipeWidget idx={idx} recipe={recipe} />
+  ));
   return (
     <div className="recipes window">
       <h4>Recipes</h4>

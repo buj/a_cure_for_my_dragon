@@ -1082,11 +1082,11 @@ export class Character {
   public constructor(init?: CharacterState) {
     if (init === undefined) {
       this.inventory = {
-        rubies: 2,
+        rubies: 4,
         alchemy: {
-          Mushroom: 2,
-          Honey: 2,
-          Waterlily: 2,
+          Mushroom: 4,
+          Honey: 4,
+          Waterlily: 4,
         },
         rawPages: {
           Bird: 0,
@@ -1139,7 +1139,7 @@ export class Character {
 
   public storageCapacity = (): number => {
     return (
-      2 +
+      4 +
       (this.skills.includes(Skill.HeftyPockets) ? 1 : 0) +
       (this.artifacts.includes(Artifact.LeatherBackpack) ? 1 : 0)
     );
@@ -2022,7 +2022,10 @@ async function interactWithMarlon(
       for (const ingredientType in recipe.ingredients) {
         const howMuch = await game.player.chooseFromRange(
           {
-            context: "interactWithMarlon.giveIngredients.ingredientsAmounts",
+            context: {
+              type: "interactWithMarlon.giveIngredients.ingredientsAmounts",
+              ingredient: ingredientType as AlchemicalResource,
+            },
             key: JSON.stringify([game.promptNumber, promptSubnumber]),
           },
           0,

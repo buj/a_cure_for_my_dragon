@@ -1,3 +1,5 @@
+import { AlchemicalResource } from "./game";
+
 export type RngContext =
   | "RecipeGenerator.generate.dialect"
   | "RecipeGenerator.generate.ingredients"
@@ -22,13 +24,16 @@ export type QuestionContext =
   | "interactWithMarlon.revealDialect.whichRecipe"
   | "interactWithMarlon.revealIngredients.whichRecipe"
   | "interactWithMarlon.giveIngredients.whichRecipe"
-  | "interactWithMarlon.giveIngredients.ingredientsAmounts"
+  | {
+      type: "interactWithMarlon.giveIngredients.ingredientsAmounts";
+      ingredient: AlchemicalResource;
+    }
   | "interactWithMerchant.tradeWhat"
   | "interactWithMerchant.tradeFor"
   | "interactWithSage.translateWhat"
   | "interactWithSage.learnWhat"
   | "chooseAction"
-  | { keepOrReroll: RngContext; value: any };
+  | { type: "keepOrReroll"; rngCtx: RngContext; value: any };
 
 export type PositionalQuestionContext =
   | "caveExit"
@@ -64,4 +69,4 @@ export type ShowContext =
   | "caveTreasure"
   | "interactWithVillage.revealPage"
   | "gameState"
-  | { reroll: RngContext };
+  | { type: "reroll"; rngCtx: RngContext };

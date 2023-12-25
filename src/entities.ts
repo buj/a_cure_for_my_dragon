@@ -63,7 +63,10 @@ export class RecordedInput<Q> implements IInput<Q> {
 export class ControlledInput<Q> implements IInput<Q> {
   public constructor(
     private source: IInput<Q>,
-    private controller: IPlayer<{ keepOrReroll: Q; value: any }, { reroll: Q }>
+    private controller: IPlayer<
+      { type: "keepOrReroll"; rngCtx: Q; value: any },
+      { type: "reroll"; rngCtx: Q }
+    >
   ) {}
 
   chooseFromRangeMapped: <T>(
@@ -83,7 +86,8 @@ export class ControlledInput<Q> implements IInput<Q> {
     const reroll = await this.controller.chooseFromList(
       {
         context: {
-          keepOrReroll: prompt.context,
+          type: "keepOrReroll",
+          rngCtx: prompt.context,
           value: mapping(srcChoice),
         },
         key: prompt.key,
@@ -103,7 +107,8 @@ export class ControlledInput<Q> implements IInput<Q> {
       this.controller.show(
         {
           context: {
-            reroll: prompt.context,
+            type: "reroll",
+            rngCtx: prompt.context,
           },
           key: prompt.key,
         },
