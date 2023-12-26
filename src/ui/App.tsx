@@ -4,10 +4,30 @@ import { GameState } from "../game";
 import { DialogueHistory } from "./HistoryWidget";
 import { PrngState } from "../entities";
 import { FrozenDialogueEntry, GameData } from "./gameData";
+import { evalThunk } from "../utils";
 
 export default function App() {
-  const [currGameData, setCurrGameData] = React.useState<Partial<GameData>>({});
-  const [gameInit, setGameInit] = React.useState<GameInit | null>(null);
+  const initGameData = evalThunk(() => {
+    const str = localStorage.getItem("gameData");
+    console.log("local storage gameData", str);
+    if (str === null) {
+      return null;
+    }
+    try {
+      return GameData.deserialize(str);
+    } catch (e) {
+      console.log("could not deserialize game data", {
+        error: e,
+        data: str,
+      });
+    }
+    return null;
+  });
+
+  const currGameDataRef = React.useRef<Partial<GameData>>(initGameData ?? {});
+  const [gameInit, setGameInit] = React.useState<GameInit | null>(
+    initGameData !== null ? { type: "loadGame", data: initGameData } : null
+  );
 
   const onUpdate = React.useCallback(
     (update: {
@@ -15,34 +35,36 @@ export default function App() {
       history?: DialogueHistory;
       rngState?: PrngState;
     }) => {
-      setCurrGameData((oldData: Partial<GameData>) => {
-        const result = { ...oldData };
-        if (update.state !== undefined) {
-          result.state = update.state;
+      const gameDataRef = currGameDataRef.current;
+      if (update.state !== undefined) {
+        gameDataRef.state = update.state;
+      }
+      if (update.rngState !== undefined) {
+        gameDataRef.rngState = update.rngState;
+      }
+      if (update.history !== undefined) {
+        const history = update.history.getHistory();
+        const last = history.slice(-1)[0];
+        if (last?.type === "show" && last.data.prompt.context === "gameState") {
+          gameDataRef.history = history.flatMap((d) => {
+            const e = FrozenDialogueEntry.fromDialogueEntry(d);
+            if (e === null) {
+              return [];
+            }
+            return [e];
+          });
         }
-        if (update.history !== undefined) {
-          const history = update.history.getHistory();
-          const last = history.slice(-1)[0];
-          if (
-            last?.type === "show" &&
-            last.data.prompt.context === "gameState"
-          ) {
-            result.history = history.flatMap((d) => {
-              const e = FrozenDialogueEntry.fromDialogueEntry(d);
-              if (e === null) {
-                return [];
-              }
-              return [e];
-            });
-          }
-        }
-        if (update.rngState !== undefined) {
-          result.rngState = update.rngState;
-        }
-        return result;
-      });
+        localStorage.setItem(
+          "gameData",
+          GameData.serialize({
+            rngState: gameDataRef.rngState!,
+            state: gameDataRef.state!,
+            history: gameDataRef.history!,
+          })
+        );
+      }
     },
-    [setCurrGameData]
+    [currGameDataRef]
   );
 
   const [seedInput, setSeedInput] = React.useState<string>("rng seed");
@@ -51,6 +73,7 @@ export default function App() {
   };
 
   const handleOnStart = () => {
+    currGameDataRef.current = {};
     setGameInit({
       type: "newGame",
       seed: seedInput,

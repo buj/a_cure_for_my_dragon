@@ -28,18 +28,28 @@ export enum Dialect {
 
 export const zDialect = z.nativeEnum(Dialect);
 
-export type Inventory = {
-  rubies: number;
-  alchemy: {
-    [key in AlchemicalResource]: number;
-  };
-  rawPages: {
-    [key in Dialect]: number;
-  };
-  translatedPages: {
-    [key in Dialect]: number;
-  };
-};
+const zInventory = z.object({
+  rubies: z.number(),
+  alchemy: z.object({
+    [AlchemicalResource.Honey]: z.number(),
+    [AlchemicalResource.Mushroom]: z.number(),
+    [AlchemicalResource.Waterlily]: z.number(),
+  }),
+  rawPages: z.object({
+    [Dialect.Bird]: z.number(),
+    [Dialect.Dragonfly]: z.number(),
+    [Dialect.Fish]: z.number(),
+    [Dialect.Mouse]: z.number(),
+  }),
+  translatedPages: z.object({
+    [Dialect.Bird]: z.number(),
+    [Dialect.Dragonfly]: z.number(),
+    [Dialect.Fish]: z.number(),
+    [Dialect.Mouse]: z.number(),
+  }),
+});
+
+export type Inventory = z.infer<typeof zInventory>;
 
 export const zInventoryOpt = z.object({
   rubies: z.number().optional(),
@@ -206,10 +216,12 @@ export const zLostPage = z.object({
 
 export type LostPage = z.infer<typeof zLostPage>;
 
-export type LostPagesGenerator = {
-  wheel: LostPage[];
-  pos: number;
-};
+export const zLostPagesGenerator = z.object({
+  wheel: z.array(zLostPage),
+  pos: z.number(),
+});
+
+export type LostPagesGenerator = z.infer<typeof zLostPagesGenerator>;
 
 export namespace LostPagesGenerator {
   export function create(): LostPagesGenerator {
@@ -270,15 +282,19 @@ export namespace LostPagesGenerator {
   }
 }
 
-export type VillagePage = {
-  page: LostPage;
-  cost: number;
-  purchased: boolean;
-};
+export const zVillagePage = z.object({
+  page: zLostPage,
+  cost: z.number(),
+  purchased: z.boolean(),
+});
 
-export type Village = {
-  pages: VillagePage[];
-};
+export type VillagePage = z.infer<typeof zVillagePage>;
+
+export const zVillage = z.object({
+  pages: z.array(zVillagePage),
+});
+
+export type Village = z.infer<typeof zVillage>;
 
 export namespace Village {
   export function create(): Village {
@@ -420,32 +436,42 @@ export namespace Village {
   }
 }
 
-export type Recipe0 = {
-  dialect: null;
-  numPages: number;
-  rubiesCost: number;
-};
+const zRecipe0 = z.object({
+  dialect: z.null(),
+  numPages: z.number(),
+  rubiesCost: z.number(),
+});
 
-export type Recipe1 = {
-  dialect: Dialect;
-  numPages: number;
-};
+export type Recipe0 = z.infer<typeof zRecipe0>;
 
-export type Recipe2 = {
-  dialect: Dialect;
-  numPages: number;
-  ingredients: { [key in AlchemicalResource]?: number };
-  ingredientsCollected: { [key in AlchemicalResource]?: number };
-};
+const zRecipe1 = z.object({
+  dialect: zDialect,
+  numPages: z.number(),
+});
 
-export type Recipe3 = {
-  dialect: Dialect;
-  numPages: number;
-  ingredients: { [key in AlchemicalResource]?: number };
-  finished: true;
-};
+export type Recipe1 = z.infer<typeof zRecipe1>;
 
-export type Recipe = Recipe0 | Recipe1 | Recipe2 | Recipe3;
+const zRecipe2 = z.object({
+  dialect: zDialect,
+  numPages: z.number(),
+  ingredients: z.record(zAlchemicalResource, z.number()),
+  ingredientsCollected: z.record(zAlchemicalResource, z.number()),
+});
+
+export type Recipe2 = z.infer<typeof zRecipe2>;
+
+const zRecipe3 = z.object({
+  dialect: zDialect,
+  numPages: z.number(),
+  ingredients: z.record(zAlchemicalResource, z.number()),
+  finished: z.literal(true),
+});
+
+export type Recipe3 = z.infer<typeof zRecipe3>;
+
+export const zRecipe = z.union([zRecipe0, zRecipe1, zRecipe2, zRecipe3]);
+
+export type Recipe = z.infer<typeof zRecipe>;
 
 export namespace Recipe {
   function isRecipe3WithAllIngredientsCollected(recipe: Recipe): boolean {
@@ -517,11 +543,15 @@ export namespace Recipe {
   }
 }
 
-export type RecipeGenerator = {
-  remainingDialects: Dialect[];
-  ingredientsRemainingCombinations: Array<AlchemicalResource[]>;
-  ingredientsRemainingCounts: number[];
-};
+const zRecipeGenerator = z.object({
+  remainingDialects: z.array(zDialect),
+  ingredientsRemainingCombinations: z.array(
+    z.tuple([zAlchemicalResource, zAlchemicalResource])
+  ),
+  ingredientsRemainingCounts: z.array(z.number()),
+});
+
+export type RecipeGenerator = z.infer<typeof zRecipeGenerator>;
 
 export namespace RecipeGenerator {
   export function create(): RecipeGenerator {
@@ -584,7 +614,7 @@ export namespace RecipeGenerator {
     } else if (!("ingredients" in recipe)) {
       const { chosen: ingredients, rest: remainingIngredientsCombos } =
         await IInput.chooseFromListWithoutReplacement<
-          AlchemicalResource[],
+          [AlchemicalResource, AlchemicalResource],
           RngContext
         >(
           rng,
@@ -654,6 +684,8 @@ export enum WorldTerrainType {
   Lake = "Lake",
 }
 
+export const zWorldTerrainType = z.nativeEnum(WorldTerrainType);
+
 export enum WorldObjectType {
   Village = "Village",
   Market = "Market",
@@ -665,6 +697,8 @@ export enum WorldObjectType {
   PreviouslyVisited = "PreviouslyVisited",
   ProductionBuilding = "ProductionBuilding",
 }
+
+export const zWorldObjectType = z.nativeEnum(WorldObjectType);
 
 export enum WorldInit {
   PlainsVillage = "V",
@@ -711,39 +745,56 @@ export enum SageId {
   SmoothRoof = "SmoothRoof",
 }
 
-type WorldObject = {
-  [WorldObjectType.Village]: {
-    type: WorldObjectType.Village;
-    data: Village;
-  };
-  [WorldObjectType.ProductionBuilding]: {
-    type: WorldObjectType.ProductionBuilding;
-    data: {
-      produces: AlchemicalResource;
-    };
-  };
-  [WorldObjectType.PreviouslyVisited]: {
-    type: WorldObjectType.PreviouslyVisited;
-    data: {
-      turnNumber: number;
-    };
-  };
-  [WorldObjectType.Sage]: {
-    type: WorldObjectType.Sage;
-    data: {
-      id: SageId;
-    };
-  };
-} & {
-  [key in WorldObjectType]: {
-    type: key;
-  };
-};
+export const zSageId = z.nativeEnum(SageId);
 
-export type Cell = {
-  terrain: WorldTerrainType;
-  object?: WorldObject[WorldObjectType];
-};
+export const zWorldObject = z.union([
+  z.object({
+    type: z.literal(WorldObjectType.Village),
+    data: zVillage,
+  }),
+  z.object({
+    type: z.literal(WorldObjectType.ProductionBuilding),
+    data: z.object({
+      produces: zAlchemicalResource,
+    }),
+  }),
+  z.object({
+    type: z.literal(WorldObjectType.PreviouslyVisited),
+    data: z.object({
+      turnNumber: z.number(),
+    }),
+  }),
+  z.object({
+    type: z.literal(WorldObjectType.Sage),
+    data: z.object({
+      id: zSageId,
+    }),
+  }),
+  z.object({
+    type: z.literal(WorldObjectType.Cave),
+  }),
+  z.object({
+    type: z.literal(WorldObjectType.Market),
+  }),
+  z.object({
+    type: z.literal(WorldObjectType.Marlon),
+  }),
+  z.object({
+    type: z.literal(WorldObjectType.Merchant),
+  }),
+  z.object({
+    type: z.literal(WorldObjectType.Portal),
+  }),
+]);
+
+export type WorldObject = z.infer<typeof zWorldObject>;
+
+export const zCell = z.object({
+  terrain: zWorldTerrainType,
+  object: zWorldObject.optional(),
+});
+
+export type Cell = z.infer<typeof zCell>;
 
 export namespace WorldInit {
   export function mapToCell(init: WorldInit): Cell {
@@ -869,7 +920,12 @@ export namespace WorldInit {
   }
 }
 
-export type Position = { y: number; x: number };
+export const zPosition = z.object({
+  y: z.number(),
+  x: z.number(),
+});
+
+export type Position = z.infer<typeof zPosition>;
 
 export namespace Position {
   export function areEqual(pos1: Position, pos2: Position): boolean {
@@ -921,6 +977,17 @@ export namespace WorldRow {
     }
   }
 }
+
+export const zWorldOfCells = z
+  .object({
+    rows: z.array(
+      z.object({
+        leftReversed: z.array(zCell),
+        right: z.array(zCell),
+      })
+    ),
+  })
+  .transform((w) => new World<Cell>(w.rows));
 
 export class World<T> {
   public constructor(public rows: WorldRow<T>[]) {}
@@ -1080,6 +1147,14 @@ export type CharacterState = {
   artifacts: Artifact[];
 };
 
+export const zCharacter = z
+  .object({
+    inventory: zInventory,
+    skills: z.array(zSkill),
+    artifacts: z.array(zArtifact),
+  })
+  .transform((cs) => new Character(cs));
+
 export class Character {
   public inventory: Inventory;
   public skills: Skill[];
@@ -1195,6 +1270,17 @@ export type GameState = {
   recipes: Recipe[];
   recipeGenerator: RecipeGenerator;
 };
+
+export const zGameState = z.object({
+  character: zCharacter,
+  world: zWorldOfCells,
+  charPos: zPosition,
+  turnNumber: z.number(),
+  lostPagesGenerator: zLostPagesGenerator,
+  lastVisitedCave: zPosition.optional(),
+  recipes: z.array(zRecipe),
+  recipeGenerator: zRecipeGenerator,
+});
 
 export namespace GameState {
   export function initial(

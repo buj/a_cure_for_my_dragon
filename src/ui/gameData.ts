@@ -1,9 +1,10 @@
 import { PrngState, Prompt } from "../entities";
-import { GameState } from "../game";
+import { GameState, zGameState } from "../game";
 import { QuestionContext } from "../protocol";
 import { PromiseState, createDeferred } from "../utils";
-import { DialogueEntry, DialogueHistory } from "./HistoryWidget";
+import { DialogueEntry } from "./HistoryWidget";
 import { Question, Show } from "./player";
+import { z } from "zod";
 
 export type FrozenQuestion = {
   prompt: Prompt<QuestionContext>;
@@ -95,3 +96,22 @@ export type GameData = {
   state: GameState;
   history: Array<FrozenDialogueEntry>;
 };
+
+export namespace GameData {
+  export function serialize(data: GameData): string {
+    return JSON.stringify(data);
+  }
+
+  export function deserialize(str: string): {
+    rngState: any;
+    state: GameState;
+    history: any;
+  } {
+    const obj = JSON.parse(str);
+    return {
+      rngState: obj["rngState"],
+      state: zGameState.parse(obj["state"]),
+      history: obj["history"],
+    };
+  }
+}
