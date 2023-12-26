@@ -480,8 +480,8 @@ export namespace Recipe {
     }
     for (const key in recipe.ingredients) {
       if (
-        recipe.ingredientsCollected[key as AlchemicalResource] ??
-        0 < recipe.ingredients[key as AlchemicalResource]!
+        (recipe.ingredientsCollected[key as AlchemicalResource] ?? 0) <
+        recipe.ingredients[key as AlchemicalResource]!
       ) {
         return false;
       }
@@ -2135,6 +2135,11 @@ async function interactWithMarlonOnce(
           }
         }
       );
+      if (choices.length === 0) {
+        return left({
+          msg: "no known recipe needs ingredients",
+        });
+      }
       const [idx, recipe] = await game.player.chooseFromList(
         {
           context: "interactWithMarlon.giveIngredients.whichRecipe",

@@ -123,6 +123,7 @@ export default function Game(deps: {
     state?: GameState;
     history?: DialogueHistory;
     rngState?: PrngState;
+    sync?: true;
   }) => void;
 }) {
   const { init, onUpdate } = deps;
@@ -175,7 +176,7 @@ export default function Game(deps: {
         return newHistory;
       });
       if (s.prompt.context === "gameState") {
-        onUpdate({ state: s.what });
+        onUpdate({ state: s.what, sync: true });
         setGameState(s.what);
       }
     };

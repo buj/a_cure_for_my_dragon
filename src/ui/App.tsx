@@ -34,6 +34,7 @@ export default function App() {
       state?: GameState;
       history?: DialogueHistory;
       rngState?: PrngState;
+      sync?: true;
     }) => {
       const gameDataRef = currGameDataRef.current;
       if (update.state !== undefined) {
@@ -43,17 +44,15 @@ export default function App() {
         gameDataRef.rngState = update.rngState;
       }
       if (update.history !== undefined) {
-        const history = update.history.getHistory();
-        const last = history.slice(-1)[0];
-        if (last?.type === "show" && last.data.prompt.context === "gameState") {
-          gameDataRef.history = history.flatMap((d) => {
-            const e = FrozenDialogueEntry.fromDialogueEntry(d);
-            if (e === null) {
-              return [];
-            }
-            return [e];
-          });
-        }
+        gameDataRef.history = update.history.getHistory().flatMap((d) => {
+          const e = FrozenDialogueEntry.fromDialogueEntry(d);
+          if (e === null) {
+            return [];
+          }
+          return [e];
+        });
+      }
+      if (update.sync) {
         localStorage.setItem(
           "gameData",
           GameData.serialize({
