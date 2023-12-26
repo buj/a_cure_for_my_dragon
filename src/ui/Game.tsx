@@ -221,6 +221,7 @@ export default function Game(deps: {
         <div
           ref={historyContainerRef}
           style={{
+            width: "40%",
             height: "100%",
             overflowY: "auto",
           }}
@@ -228,16 +229,18 @@ export default function Game(deps: {
           <HistoryWidget history={dialogueHistory} />
         </div>
         <Board question={activeQuestion} gameState={gameState} />
-        {gameState !== null && (
-          <div style={{ height: "100%", overflowY: "auto" }}>
-            <RecipesWidget state={gameState} />
-            <LostPagesWidget
-              lostPagesGenerator={gameState.lostPagesGenerator}
-            />
-            <InventoryWidget character={gameState.character} />
-            <SkillsWidget learnedSkills={gameState.character.skills} />
-          </div>
-        )}
+        <div style={{ width: "40%", height: "100%", overflowY: "auto" }}>
+          {gameState !== null && (
+            <>
+              <RecipesWidget state={gameState} />
+              <LostPagesWidget
+                lostPagesGenerator={gameState.lostPagesGenerator}
+              />
+              <InventoryWidget character={gameState.character} />
+              <SkillsWidget learnedSkills={gameState.character.skills} />
+            </>
+          )}
+        </div>
       </div>
       {latestError && <ErrorPrompt error={latestError} />}
     </div>
