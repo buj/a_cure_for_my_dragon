@@ -16,7 +16,7 @@ import {
   RecipeGenerator,
 } from "../game";
 
-type DialogueEntry =
+export type DialogueEntry =
   | {
       type: "question";
       data: Question;
@@ -33,9 +33,9 @@ namespace DialogueEntry {
 }
 
 export class DialogueHistory {
-  public constructor(
-    private history: Array<DialogueEntry> = [],
-    private mapToOrd: Record<string, number> = {}
+  constructor(
+    private history: Array<DialogueEntry>,
+    private mapToOrd: Record<string, number>
   ) {}
 
   // return this if no cutoff (i.e. `d` is not in history)
@@ -67,6 +67,21 @@ export class DialogueHistory {
   public getHistory = (): Array<DialogueEntry> => {
     return this.history;
   };
+}
+
+export namespace DialogueHistory {
+  export function create(): DialogueHistory {
+    return new DialogueHistory([], {});
+  }
+
+  export function from(history: Array<DialogueEntry>): DialogueHistory {
+    const mapToOrd: Record<string, number> = {};
+    for (const [i, d] of history.entries()) {
+      const key = DialogueEntry.deriveKey(d);
+      mapToOrd[key] = i;
+    }
+    return new DialogueHistory(history, mapToOrd);
+  }
 }
 
 function translateQuestionContext(q: QuestionContext): string {

@@ -19,6 +19,12 @@
   padding: 0.5em;
 }
 
+.controlPanel {
+  padding-bottom: 0.5em;
+  border-bottom-style: solid;
+  border-bottom-width: 0.1em;
+}
+
 .window {
   padding: 0.5em;
   border-style: solid;
@@ -26,6 +32,7 @@
 }
 
 .errorPrompt {
+  padding: 0.5em;
   background-color: #ff8888;
 }
 

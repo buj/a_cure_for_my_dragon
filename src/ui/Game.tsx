@@ -5,20 +5,21 @@ import {
   Dialect,
   GameActionError,
   GameState,
-  Inventory,
   Skill,
   runGame,
 } from "../game";
 import { Question, Show, UIPlayer } from "./player";
 import HistoryWidget, { DialogueHistory } from "./HistoryWidget";
-import { Prng } from "../entities";
+import { IInput, Prng, PrngState, Prompt } from "../entities";
 import Board from "./Board";
 import RecipesWidget from "./RecipesWidget";
 import LostPagesWidget from "./LostPagesWidget";
 import { alchemyStr, dialectStr, progressBarStr, unaryStr } from "./utils";
+import { FrozenDialogueEntry, GameData } from "./gameData";
+import { RngContext } from "../protocol";
 
 function ErrorPrompt(deps: { error: GameActionError }) {
-  return <div className="errorPrompt window">{JSON.stringify(deps.error)}</div>;
+  return <div className="errorPrompt">{JSON.stringify(deps.error)}</div>;
 }
 
 function InventoryWidget(deps: { character: Character }) {
@@ -72,15 +73,80 @@ function SkillsWidget(deps: { learnedSkills: Skill[] }) {
   );
 }
 
-export default function Game() {
+export type GameInit =
+  | {
+      type: "newGame";
+      seed: string;
+    }
+  | {
+      type: "loadGame";
+      data: GameData;
+    };
+
+function initHistory(init: GameInit): DialogueHistory {
+  return init.type === "loadGame"
+    ? DialogueHistory.from(
+        init.data.history.map(FrozenDialogueEntry.toDialogueEntry)
+      )
+    : DialogueHistory.create();
+}
+
+class PrngWithCallback implements IInput<RngContext> {
+  public constructor(
+    private rng: Prng<RngContext>,
+    private onUpdate: (state: PrngState) => void
+  ) {}
+
+  public chooseFromRange = async (
+    prompt: Prompt<RngContext>,
+    l: number,
+    r: number
+  ) => {
+    const result = await this.rng.chooseFromRange(prompt, l, r);
+    this.onUpdate(this.rng.state());
+    return result;
+  };
+
+  public chooseFromList: <T>(
+    prompt: Prompt<RngContext>,
+    ls: T[]
+  ) => Promise<T> = async (prompt, ls) => {
+    const result = await this.rng.chooseFromList(prompt, ls);
+    this.onUpdate(this.rng.state());
+    return result;
+  };
+}
+
+export default function Game(deps: {
+  init: GameInit;
+  onUpdate: (update: {
+    state?: GameState;
+    history?: DialogueHistory;
+    rngState?: PrngState;
+  }) => void;
+}) {
+  const { init, onUpdate } = deps;
+
+  const [lastInit, setLastInit] = React.useState<GameInit | null>(null);
   const [activeQuestion, setActiveQuestion] = React.useState<Question | null>(
     null
   );
   const [gameState, setGameState] = React.useState<GameState | null>(null);
   const [dialogueHistory, setDialogueHistory] = React.useState(
-    new DialogueHistory()
+    initHistory(init)
   );
   const [latestError, setError] = React.useState<GameActionError | null>(null);
+
+  if (init !== lastInit) {
+    setLastInit(init);
+    if (activeQuestion !== null) {
+      activeQuestion.answer.reject("new game starting");
+    }
+    setActiveQuestion(null);
+    setGameState(null);
+    setDialogueHistory(initHistory(init));
+    setError(null);
+  }
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
@@ -100,20 +166,38 @@ export default function Game() {
       setActiveQuestion(q);
     };
     const onShow = (s: Show) => {
-      setDialogueHistory((dialogueHistory) =>
-        dialogueHistory.add({
+      setDialogueHistory((dialogueHistory) => {
+        const newHistory = dialogueHistory.add({
           type: "show",
           data: s,
-        })
-      );
+        });
+        onUpdate({ history: newHistory });
+        return newHistory;
+      });
       if (s.prompt.context === "gameState") {
+        onUpdate({ state: s.what });
         setGameState(s.what);
       }
     };
     const player = new UIPlayer(onNewActiveQuestion, onShow);
-    const prng = new Prng("164012421");
-    runGame(prng, player, setError);
-  }, [setActiveQuestion, setGameState, setDialogueHistory]);
+    const rng = new PrngWithCallback(
+      new Prng(init.type === "newGame" ? init.seed : init.data.rngState),
+      (rngState) => onUpdate({ rngState })
+    );
+    runGame(
+      init.type === "loadGame"
+        ? {
+            state: init.data.state,
+            promptNumber: init.data.history.length,
+          }
+        : null,
+      rng,
+      player,
+      setError
+    ).catch((reason) => {
+      console.log("game ended with error", { reason });
+    });
+  }, [init, onUpdate, setActiveQuestion, setGameState, setDialogueHistory]);
 
   const historyContainerRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -126,24 +210,26 @@ export default function Game() {
   return (
     <div
       className="game"
-      style={{ display: "flex", flexDirection: "column", height: "95vh" }}
+      style={{
+        flexGrow: 1,
+        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+      }}
     >
       <div style={{ display: "flex", overflowY: "clip", flexGrow: 1 }}>
         <div
           ref={historyContainerRef}
           style={{
-            width: "20%",
             height: "100%",
             overflowY: "auto",
           }}
         >
           <HistoryWidget history={dialogueHistory} />
         </div>
-        <div style={{ width: "60%", maxHeight: "100%" }}>
-          <Board question={activeQuestion} gameState={gameState} />
-        </div>
+        <Board question={activeQuestion} gameState={gameState} />
         {gameState !== null && (
-          <div style={{ width: "20%", height: "100%", overflowY: "auto" }}>
+          <div style={{ height: "100%", overflowY: "auto" }}>
             <RecipesWidget state={gameState} />
             <LostPagesWidget
               lostPagesGenerator={gameState.lostPagesGenerator}

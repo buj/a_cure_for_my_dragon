@@ -1261,13 +1261,13 @@ export namespace GameState {
 
 export class BootstrappedGame {
   state: GameState;
-  sourceRng: Prng<RngContext>;
+  sourceRng: IInput<RngContext>;
   player: IPlayer<QuestionContext, ShowContext>;
   promptNumber: number;
 
   public constructor(init: {
     state: GameState;
-    sourceRng: Prng<RngContext>;
+    sourceRng: IInput<RngContext>;
     player: IPlayer<QuestionContext, ShowContext>;
     promptNumber: number;
   }) {
@@ -1299,7 +1299,7 @@ export class BootstrappedGame {
 
 export namespace BootstrappedGame {
   export async function createInitial(
-    sourceRng: Prng<RngContext>,
+    sourceRng: IInput<RngContext>,
     player: IPlayer<QuestionContext, ShowContext>
   ): Promise<BootstrappedGame> {
     const worldInit = World.init(defaultWorld);
@@ -2360,11 +2360,23 @@ async function takeAction(
 }
 
 export async function runGame(
-  sourceRng: Prng<RngContext>,
+  init: { state: GameState; promptNumber: number } | null,
+  sourceRng: IInput<RngContext>,
   player: IPlayer<QuestionContext, ShowContext>,
   errorHandler: (e: GameActionError) => void
 ) {
-  var game = await BootstrappedGame.createInitial(sourceRng, player);
+  var game = await evalThunk(() => {
+    if (init !== null) {
+      return new BootstrappedGame({
+        state: init.state,
+        sourceRng,
+        player,
+        promptNumber: init.promptNumber,
+      });
+    } else {
+      return BootstrappedGame.createInitial(sourceRng, player);
+    }
+  });
   while (true) {
     player.show(
       {
