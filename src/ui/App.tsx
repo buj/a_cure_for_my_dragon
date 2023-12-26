@@ -21,13 +21,20 @@ export default function App() {
           result.state = update.state;
         }
         if (update.history !== undefined) {
-          result.history = update.history.getHistory().flatMap((d) => {
-            const e = FrozenDialogueEntry.fromDialogueEntry(d);
-            if (e === null) {
-              return [];
-            }
-            return [e];
-          });
+          const history = update.history.getHistory();
+          const last = history.slice(-1)[0];
+          if (
+            last?.type === "show" &&
+            last.data.prompt.context === "gameState"
+          ) {
+            result.history = history.flatMap((d) => {
+              const e = FrozenDialogueEntry.fromDialogueEntry(d);
+              if (e === null) {
+                return [];
+              }
+              return [e];
+            });
+          }
         }
         if (update.rngState !== undefined) {
           result.rngState = update.rngState;
