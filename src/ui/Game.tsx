@@ -59,11 +59,35 @@ function InventoryWidget(deps: { character: Character }) {
   );
 }
 
+function skillSageImgSrc(s: Skill): string {
+  switch (s) {
+    case Skill.HeftyPockets:
+    case Skill.Negotiation:
+      return "sageWithChimney.svg";
+    case Skill.Mountaineering:
+    case Skill.Spelunking:
+      return "sageSharp.svg";
+    case Skill.SwiftBoots:
+    case Skill.WoodlandExplorer:
+      return "sageSmooth.svg";
+  }
+}
+
 function SkillsWidget(deps: { learnedSkills: Skill[] }) {
   const { learnedSkills } = deps;
   const elems = Object.values(Skill).map((s) => {
     const tags = ["skill"].concat(learnedSkills.includes(s) ? ["learned"] : []);
-    return <div className={tags.join(" ")}>{s}</div>;
+    return (
+      <div>
+        <span className={tags.join(" ")}>{s}</span>
+        {"\u00A0"}
+        <img
+          src={skillSageImgSrc(s)}
+          style={{ height: "1em" }}
+          alt={skillSageImgSrc(s)}
+        />
+      </div>
+    );
   });
   return (
     <div className="skills window">
