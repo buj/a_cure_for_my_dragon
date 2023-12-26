@@ -469,7 +469,7 @@ const zRecipe3 = z.object({
 
 export type Recipe3 = z.infer<typeof zRecipe3>;
 
-export const zRecipe = z.union([zRecipe0, zRecipe1, zRecipe2, zRecipe3]);
+export const zRecipe = z.union([zRecipe3, zRecipe2, zRecipe1, zRecipe0]);
 
 export type Recipe = z.infer<typeof zRecipe>;
 
