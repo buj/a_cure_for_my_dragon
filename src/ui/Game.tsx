@@ -194,8 +194,8 @@ export default function Game(deps: {
       rng,
       player,
       setError
-    ).catch((reason) => {
-      console.log("game ended with error", { reason });
+    ).catch((reason): void => {
+      console.log("game ended with error", { reason: JSON.stringify(reason) });
     });
   }, [init, onUpdate, setActiveQuestion, setGameState, setDialogueHistory]);
 
