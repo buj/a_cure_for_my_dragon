@@ -1791,17 +1791,76 @@ type Trade = z.infer<typeof zTrade>;
 async function interactWithMarketOnce(
   game: BootstrappedGame
 ): Promise<GameActionResult<BootstrappedGame | null>> {
+  const cands: { [key in MarketTradeType]: Trade[] } = {
+    [MarketTradeType.GoodForGood]: [
+      { cost: { alchemy: { Mushroom: 1 } }, gain: { alchemy: { Honey: 1 } } },
+      {
+        cost: { alchemy: { Mushroom: 1 } },
+        gain: { alchemy: { Waterlily: 1 } },
+      },
+      { cost: { alchemy: { Honey: 1 } }, gain: { alchemy: { Mushroom: 1 } } },
+      {
+        cost: { alchemy: { Honey: 1 } },
+        gain: { alchemy: { Waterlily: 1 } },
+      },
+      {
+        cost: { alchemy: { Waterlily: 1 } },
+        gain: { alchemy: { Honey: 1 } },
+      },
+      {
+        cost: { alchemy: { Waterlily: 1 } },
+        gain: { alchemy: { Mushroom: 1 } },
+      },
+    ].filter(
+      (trade) =>
+        game.state.character.tradeItems(trade.cost, trade.gain)._tag === "Right"
+    ),
+    [MarketTradeType.RubyForGoods]: [
+      { cost: { rubies: 1 }, gain: { alchemy: { Honey: 2 } } },
+      { cost: { rubies: 1 }, gain: { alchemy: { Mushroom: 2 } } },
+      { cost: { rubies: 1 }, gain: { alchemy: { Waterlily: 2 } } },
+      { cost: { rubies: 1 }, gain: { alchemy: { Honey: 1, Mushroom: 1 } } },
+      { cost: { rubies: 1 }, gain: { alchemy: { Honey: 1, Waterlily: 1 } } },
+      {
+        cost: { rubies: 1 },
+        gain: { alchemy: { Mushroom: 1, Waterlily: 1 } },
+      },
+    ].filter(
+      (trade) =>
+        game.state.character.tradeItems(trade.cost, trade.gain)._tag === "Right"
+    ),
+    [MarketTradeType.GoodsForRuby]: [
+      { cost: { alchemy: { Honey: 2 } }, gain: { rubies: 1 } },
+      { cost: { alchemy: { Mushroom: 2 } }, gain: { rubies: 1 } },
+      { cost: { alchemy: { Waterlily: 2 } }, gain: { rubies: 1 } },
+      { cost: { alchemy: { Honey: 1, Mushroom: 1 } }, gain: { rubies: 1 } },
+      { cost: { alchemy: { Honey: 1, Waterlily: 1 } }, gain: { rubies: 1 } },
+      {
+        cost: { alchemy: { Mushroom: 1, Waterlily: 1 } },
+        gain: { rubies: 1 },
+      },
+    ].filter(
+      (trade) =>
+        game.state.character.tradeItems(trade.cost, trade.gain)._tag === "Right"
+    ),
+  };
   const tradeType = await game.player.chooseFromList(
     {
       context: "interactWithMarket.tradeType",
       key: JSON.stringify([game.promptNumber, 0]),
     },
     [
-      MarketTradeType.GoodForGood,
-      MarketTradeType.RubyForGoods,
-      MarketTradeType.GoodsForRuby,
-      null,
-    ]
+      cands[MarketTradeType.GoodForGood].length > 0
+        ? [MarketTradeType.GoodForGood]
+        : [],
+      cands[MarketTradeType.RubyForGoods].length > 0
+        ? [MarketTradeType.RubyForGoods]
+        : [],
+      cands[MarketTradeType.GoodsForRuby].length > 0
+        ? [MarketTradeType.GoodsForRuby]
+        : [],
+      [null],
+    ].flatMap((ls) => ls)
   );
   if (tradeType === null) {
     return right(null);
@@ -1811,75 +1870,7 @@ async function interactWithMarketOnce(
     key: JSON.stringify([game.promptNumber, 1]),
   } as const;
 
-  var trade: Trade;
-  switch (tradeType) {
-    case MarketTradeType.GoodForGood: {
-      const cands = [
-        { cost: { alchemy: { Mushroom: 1 } }, gain: { alchemy: { Honey: 1 } } },
-        {
-          cost: { alchemy: { Mushroom: 1 } },
-          gain: { alchemy: { Waterlily: 1 } },
-        },
-        { cost: { alchemy: { Honey: 1 } }, gain: { alchemy: { Mushroom: 1 } } },
-        {
-          cost: { alchemy: { Honey: 1 } },
-          gain: { alchemy: { Waterlily: 1 } },
-        },
-        {
-          cost: { alchemy: { Waterlily: 1 } },
-          gain: { alchemy: { Honey: 1 } },
-        },
-        {
-          cost: { alchemy: { Waterlily: 1 } },
-          gain: { alchemy: { Mushroom: 1 } },
-        },
-      ].filter(
-        (trade) =>
-          game.state.character.tradeItems(trade.cost, trade.gain)._tag ===
-          "Right"
-      );
-      trade = await game.player.chooseFromList(prompt2, cands);
-      break;
-    }
-    case MarketTradeType.RubyForGoods: {
-      const cands = [
-        { cost: { rubies: 1 }, gain: { alchemy: { Honey: 2 } } },
-        { cost: { rubies: 1 }, gain: { alchemy: { Mushroom: 2 } } },
-        { cost: { rubies: 1 }, gain: { alchemy: { Waterlily: 2 } } },
-        { cost: { rubies: 1 }, gain: { alchemy: { Honey: 1, Mushroom: 1 } } },
-        { cost: { rubies: 1 }, gain: { alchemy: { Honey: 1, Waterlily: 1 } } },
-        {
-          cost: { rubies: 1 },
-          gain: { alchemy: { Mushroom: 1, Waterlily: 1 } },
-        },
-      ].filter(
-        (trade) =>
-          game.state.character.tradeItems(trade.cost, trade.gain)._tag ===
-          "Right"
-      );
-      trade = await game.player.chooseFromList(prompt2, cands);
-      break;
-    }
-    case MarketTradeType.GoodsForRuby: {
-      const cands = [
-        { cost: { alchemy: { Honey: 2 } }, gain: { rubies: 1 } },
-        { cost: { alchemy: { Mushroom: 2 } }, gain: { rubies: 1 } },
-        { cost: { alchemy: { Waterlily: 2 } }, gain: { rubies: 1 } },
-        { cost: { alchemy: { Honey: 1, Mushroom: 1 } }, gain: { rubies: 1 } },
-        { cost: { alchemy: { Honey: 1, Waterlily: 1 } }, gain: { rubies: 1 } },
-        {
-          cost: { alchemy: { Mushroom: 1, Waterlily: 1 } },
-          gain: { rubies: 1 },
-        },
-      ].filter(
-        (trade) =>
-          game.state.character.tradeItems(trade.cost, trade.gain)._tag ===
-          "Right"
-      );
-      trade = await game.player.chooseFromList(prompt2, cands);
-      break;
-    }
-  }
+  const trade = await game.player.chooseFromList(prompt2, cands[tradeType]);
   const newCharacterState = game.state.character.tradeItems(
     trade.cost,
     trade.gain
