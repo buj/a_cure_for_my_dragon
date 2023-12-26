@@ -1126,7 +1126,7 @@ export class Character {
 
   public storageCapacity = (): number => {
     return (
-      4 +
+      2 +
       (this.skills.includes(Skill.HeftyPockets) ? 1 : 0) +
       (this.artifacts.includes(Artifact.LeatherBackpack) ? 1 : 0)
     );
