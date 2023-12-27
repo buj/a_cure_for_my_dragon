@@ -2154,6 +2154,13 @@ async function interactWithMarlonOnce(
         Waterlily: 0,
       };
       for (const ingredientType in recipe.ingredients) {
+        if (
+          recipe.ingredients[ingredientType as AlchemicalResource] ===
+          (recipe.ingredientsCollected[ingredientType as AlchemicalResource] ??
+            0)
+        ) {
+          continue;
+        }
         const howMuch = await game.player.chooseFromRange(
           {
             context: {

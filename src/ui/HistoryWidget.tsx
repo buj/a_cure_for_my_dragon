@@ -147,9 +147,9 @@ function translateQuestionContext(q: QuestionContext): string {
     case "interactWithMerchant.tradeWhat":
       return "What page type do you want to trade?";
     case "interactWithSage.learnWhat":
-      return "Which skill would you like to learn?";
+      return "Which skill would you like to learn? (cost: 1💎 if any)";
     case "interactWithSage.translateWhat":
-      return "Which page would you like to translate?";
+      return "Which page would you like to translate? (cost: 1💎 if any)";
     case "portalDestination":
       return "Choose portal destination.";
     case "startGame.honeyBuilding":
