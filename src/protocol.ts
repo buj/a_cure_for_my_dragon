@@ -69,4 +69,5 @@ export type ShowContext =
   | "caveTreasure"
   | "interactWithVillage.revealPage"
   | "gameState"
+  | "victory"
   | { type: "reroll"; rngCtx: RngContext };

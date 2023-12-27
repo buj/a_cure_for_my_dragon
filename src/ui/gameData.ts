@@ -108,6 +108,12 @@ export namespace GameData {
     history: any;
   } {
     const obj = JSON.parse(str);
+    if (!("rngState" in obj)) {
+      throw new Error("rngState missing from game data");
+    }
+    if (!("history" in obj)) {
+      throw new Error("history missing from game data");
+    }
     return {
       rngState: obj["rngState"],
       state: zGameState.parse(obj["state"]),

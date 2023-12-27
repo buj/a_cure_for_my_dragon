@@ -108,10 +108,23 @@ namespace BoardImpl {
 
   export function worldElements(state: GameState) {
     return state.world.listHexes().flatMap(({ pos, value: cell }) => {
+      const centerPixel = getCenterPixelForPos(pos);
+      if (cell.isStartingPosition) {
+        return [
+          <text
+            x={centerPixel.x}
+            y={centerPixel.y}
+            fontSize={hexRadius}
+            textAnchor="middle"
+            dominantBaseline="middle"
+          >
+            🐉
+          </text>,
+        ];
+      }
       if (cell.object === undefined) {
         return [];
       }
-      const centerPixel = getCenterPixelForPos(pos);
       switch (cell.object.type) {
         case WorldObjectType.PreviouslyVisited: {
           const opacity =
@@ -280,7 +293,10 @@ export default function Board(deps: {
   });
   const onMouseMove = evalThunk(() => {
     if (question === null) {
-      return undefined;
+      if (cursorRef.current) {
+        cursorRef.current.setAttribute("visibility", "hidden");
+      }
+      return;
     }
     return (e: React.MouseEvent<SVGSVGElement>) => {
       BoardImpl.onMouseMove(question, e, svgRef, cursorRef);

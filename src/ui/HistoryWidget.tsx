@@ -225,6 +225,9 @@ function DialogueEntryVisualization(d: DialogueEntry) {
           case "gameState": {
             return `Move ${(d.data.what as GameState).turnNumber}`;
           }
+          case "victory": {
+            return "You win!";
+          }
         }
       });
       return (

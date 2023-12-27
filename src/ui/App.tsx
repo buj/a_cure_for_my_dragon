@@ -6,6 +6,26 @@ import { PrngState } from "../entities";
 import { FrozenDialogueEntry, GameData } from "./gameData";
 import { evalThunk } from "../utils";
 
+function historyMatchesGameState(
+  history: Array<FrozenDialogueEntry> | undefined,
+  gameState: GameState | undefined
+): boolean {
+  if (history === undefined || gameState === undefined) {
+    return false;
+  }
+  const lastEntry = history.slice(-1)[0];
+  if (lastEntry === undefined) {
+    return false;
+  }
+  if (
+    lastEntry.type === "show" &&
+    lastEntry.data.prompt.context === "gameState"
+  ) {
+    return lastEntry.data.what === gameState;
+  }
+  return false;
+}
+
 export default function App() {
   const initGameData = evalThunk(() => {
     const str = localStorage.getItem("gameData");
@@ -25,7 +45,7 @@ export default function App() {
   });
 
   const currGameDataRef = React.useRef<Partial<GameData>>(initGameData ?? {});
-  const [gameInit, setGameInit] = React.useState<GameInit | null>(
+  const [gameInit, setGameInit] = React.useState<GameInit | null>(() =>
     initGameData !== null ? { type: "loadGame", data: initGameData } : null
   );
 
@@ -34,7 +54,6 @@ export default function App() {
       state?: GameState;
       history?: DialogueHistory;
       rngState?: PrngState;
-      sync?: true;
     }) => {
       const gameDataRef = currGameDataRef.current;
       if (update.state !== undefined) {
@@ -52,7 +71,7 @@ export default function App() {
           return [e];
         });
       }
-      if (update.sync) {
+      if (historyMatchesGameState(gameDataRef.history, gameDataRef.state)) {
         localStorage.setItem(
           "gameData",
           GameData.serialize({

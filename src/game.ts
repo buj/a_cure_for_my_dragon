@@ -792,6 +792,7 @@ export type WorldObject = z.infer<typeof zWorldObject>;
 export const zCell = z.object({
   terrain: zWorldTerrainType,
   object: zWorldObject.optional(),
+  isStartingPosition: z.literal(true).optional(),
 });
 
 export type Cell = z.infer<typeof zCell>;
@@ -1333,7 +1334,7 @@ export namespace GameState {
       turnNumber: gameState.turnNumber + 1,
       charPos: target,
       world: gameState.world.set(target, {
-        terrain: targetCell.terrain,
+        ...targetCell,
         object: {
           type: WorldObjectType.PreviouslyVisited,
           data: {
@@ -1342,6 +1343,26 @@ export namespace GameState {
         },
       }),
     });
+  }
+
+  export function areRecipesFinished(gameState: GameState): boolean {
+    return gameState.recipes
+      .map((r) => {
+        if ("finished" in r) {
+          return r.finished;
+        } else {
+          return false;
+        }
+      })
+      .reduce((a, b) => a && b);
+  }
+
+  export function victory(gameState: GameState): boolean {
+    const charPosCell = gameState.world.get(gameState.charPos);
+    return (
+      areRecipesFinished(gameState) &&
+      (charPosCell?.isStartingPosition ?? false)
+    );
   }
 }
 
@@ -1448,10 +1469,7 @@ export namespace BootstrappedGame {
         world: initialState.world
           .set(startPos, {
             ...initialState.world.get(startPos)!,
-            object: {
-              type: WorldObjectType.PreviouslyVisited,
-              data: { turnNumber: 0 },
-            },
+            isStartingPosition: true,
           })
           .set(whereHoney, {
             ...initialState.world.get(whereHoney)!,
@@ -2474,16 +2492,34 @@ export async function runGame(
       },
       game.state
     );
+    if (GameState.victory(game.state)) {
+      player.show(
+        {
+          context: "victory",
+          key: JSON.stringify([game.promptNumber, 0]),
+        },
+        null
+      );
+      break;
+    }
     const possibleMoves: GameAction[] =
       World.listCellsCanReachAndCanEndTurnThere(
         game.state.world,
         game.state.charPos,
         game.state.character.movementSpeed(),
         game.state.character.canTraverse
-      ).map(({ pos }) => ({
-        type: GameActionType.Move,
-        target: pos,
-      }));
+      )
+        .filter(({ cell }) => {
+          if (cell.isStartingPosition) {
+            return GameState.areRecipesFinished(game.state);
+          } else {
+            return true;
+          }
+        })
+        .map(({ pos }) => ({
+          type: GameActionType.Move,
+          target: pos,
+        }));
     const possibleInteractions: GameAction[] = game.state.world
       .getAdjacents(game.state.charPos)
       .map(({ pos }) => ({

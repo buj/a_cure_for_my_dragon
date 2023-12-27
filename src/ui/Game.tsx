@@ -107,19 +107,13 @@ export type GameInit =
       data: GameData;
     };
 
-function initHistory(init: GameInit): DialogueHistory {
-  return init.type === "loadGame"
-    ? DialogueHistory.from(
-        init.data.history.map(FrozenDialogueEntry.toDialogueEntry)
-      )
-    : DialogueHistory.create();
-}
-
 class PrngWithCallback implements IInput<RngContext> {
   public constructor(
     private rng: Prng<RngContext>,
     private onUpdate: (state: PrngState) => void
-  ) {}
+  ) {
+    onUpdate(rng.state());
+  }
 
   public chooseFromRange = async (
     prompt: Prompt<RngContext>,
@@ -147,7 +141,6 @@ export default function Game(deps: {
     state?: GameState;
     history?: DialogueHistory;
     rngState?: PrngState;
-    sync?: true;
   }) => void;
   autoCollectResources: { current: boolean };
 }) {
@@ -158,9 +151,20 @@ export default function Game(deps: {
     null
   );
   const [gameState, setGameState] = React.useState<GameState | null>(null);
-  const [dialogueHistory, setDialogueHistory] = React.useState(
-    initHistory(init)
-  );
+
+  const initHistory = () => {
+    const history =
+      init.type === "loadGame"
+        ? DialogueHistory.from(
+            init.data.history.map(FrozenDialogueEntry.toDialogueEntry)
+          )
+        : DialogueHistory.create();
+    onUpdate({ history });
+    return history;
+  };
+  const [dialogueHistory, setDialogueHistory] =
+    React.useState<DialogueHistory>(initHistory);
+
   const [latestError, setError] = React.useState<GameActionError | null>(null);
 
   if (init !== lastInit) {
@@ -170,7 +174,7 @@ export default function Game(deps: {
     }
     setActiveQuestion(null);
     setGameState(null);
-    setDialogueHistory(initHistory(init));
+    setDialogueHistory(initHistory);
     setError(null);
   }
 
@@ -201,8 +205,11 @@ export default function Game(deps: {
         return newHistory;
       });
       if (s.prompt.context === "gameState") {
-        onUpdate({ state: s.what, sync: true });
+        onUpdate({ state: s.what });
         setGameState(s.what);
+      }
+      if (s.prompt.context === "victory") {
+        setActiveQuestion(null);
       }
     };
     const player = new UIPlayer(
