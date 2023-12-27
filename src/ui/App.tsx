@@ -71,6 +71,11 @@ export default function App() {
     setSeedInput(e.target.value);
   };
 
+  const autocollectResourcesRef = React.useRef<boolean>(true);
+  const onAutocollectSettingChange = () => {
+    autocollectResourcesRef.current = !autocollectResourcesRef.current;
+  };
+
   const handleOnStart = () => {
     currGameDataRef.current = {};
     setGameInit({
@@ -85,14 +90,31 @@ export default function App() {
       style={{ display: "flex", flexDirection: "column", height: "95vh" }}
     >
       <div className="controlPanel">
-        <input
-          id="seedInput"
-          onChange={handleSeedInputChange}
-          defaultValue={"rng seed"}
-        />
-        <button onClick={handleOnStart}>Start game</button>
+        <div>
+          <input
+            id="seedInput"
+            onChange={handleSeedInputChange}
+            defaultValue={"rng seed"}
+          />
+          <button onClick={handleOnStart}>Start game</button>
+        </div>
+        <div>
+          <input
+            id="autocollectGoods"
+            type="checkbox"
+            defaultChecked={true}
+            onClick={onAutocollectSettingChange}
+          />
+          <label htmlFor="autocollectGoods">autocollect goods</label>
+        </div>
       </div>
-      {gameInit !== null && <Game init={gameInit} onUpdate={onUpdate} />}
+      {gameInit !== null && (
+        <Game
+          init={gameInit}
+          onUpdate={onUpdate}
+          autoCollectResources={autocollectResourcesRef}
+        />
+      )}
     </div>
   );
 }
