@@ -106,6 +106,25 @@ namespace BoardImpl {
     });
   }
 
+  export function extraElements(state: GameState) {
+    const result: React.JSX.Element[] = [];
+    if (state.lastVisitedCave !== undefined) {
+      const centerPixel = getCenterPixelForPos(state.lastVisitedCave);
+      result.push(
+        <text
+          x={centerPixel.x}
+          y={centerPixel.y}
+          fontSize={hexRadius}
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          ❌
+        </text>
+      );
+    }
+    return result;
+  }
+
   export function worldElements(state: GameState) {
     return state.world.listHexes().flatMap(({ pos, value: cell }) => {
       const centerPixel = getCenterPixelForPos(pos);
@@ -323,6 +342,7 @@ export default function Board(deps: {
         <>
           {BoardImpl.worldElements(gameState)}
           {BoardImpl.obtainedArtifactsMarkers(gameState.character.artifacts)}
+          {BoardImpl.extraElements(gameState)}
         </>
       )}
       {question !== null && BoardImpl.highlightChoices(question)}
