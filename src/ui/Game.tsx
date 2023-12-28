@@ -174,7 +174,6 @@ export default function Game(deps: {
       activeQuestion.answer.reject("new game starting");
     }
     setActiveQuestion(null);
-    setGameState(null);
     setDialogueHistory(initHistory);
     setError(null);
   }

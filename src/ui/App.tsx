@@ -221,8 +221,6 @@ export default function App() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // TODO
-    console.log("handleKeyDown", e);
     if (e.key === "z" && e.ctrlKey) {
       handleUndo();
     }
@@ -231,6 +229,7 @@ export default function App() {
   return (
     <div
       className="app"
+      tabIndex={0}
       style={{ display: "flex", flexDirection: "column", height: "95vh" }}
       onKeyDown={handleKeyDown}
     >
