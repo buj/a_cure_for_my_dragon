@@ -143,8 +143,9 @@ export default function Game(deps: {
     rngState?: PrngState;
   }) => void;
   autoCollectResources: { current: boolean };
+  onUserAction: () => void;
 }) {
-  const { init, onUpdate, autoCollectResources } = deps;
+  const { init, onUpdate, autoCollectResources, onUserAction } = deps;
 
   const [lastInit, setLastInit] = React.useState<GameInit | null>(null);
   const [activeQuestion, setActiveQuestion] = React.useState<Question | null>(
@@ -217,7 +218,8 @@ export default function Game(deps: {
     const player = new UIPlayer(
       onNewActiveQuestion,
       onShow,
-      autoCollectResources
+      autoCollectResources,
+      onUserAction
     );
     const rng = new PrngWithCallback(
       new Prng(init.type === "newGame" ? init.seed : init.data.rngState),

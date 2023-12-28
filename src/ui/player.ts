@@ -27,23 +27,22 @@ export type Show = { prompt: Prompt<ShowContext>; what: any };
 
 export class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
   private gameState: GameState | null;
-  private userEngaged: boolean;
 
   public constructor(
     private setActiveQuestion: (q: Question) => void,
     private display: (s: Show) => void,
-    private autoCollectResources: { current: boolean }
+    private autoCollectResources: { current: boolean },
+    private onUserAction: () => void
   ) {
     this.gameState = null;
-    this.userEngaged = false;
   }
 
-  makeDeferred(): Deferred<number> {
+  makeDeferredWithUserActionHook(): Deferred<number> {
     const inner = createDeferred<number>();
     return {
       ...inner,
       resolve: (value: number) => {
-        this.userEngaged = true;
+        this.onUserAction();
         inner.resolve(value);
       },
     };
@@ -54,7 +53,7 @@ export class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
     l: number,
     r: number
   ): Promise<number> => {
-    const answer = this.makeDeferred();
+    const answer = this.makeDeferredWithUserActionHook();
     this.setActiveQuestion({
       prompt,
       query: {
@@ -71,9 +70,8 @@ export class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
     prompt: Prompt<QuestionContext>,
     ls: T[]
   ) => Promise<T> = async (prompt, ls) => {
-    const answer = this.makeDeferred();
+    var answer = this.makeDeferredWithUserActionHook();
     if (
-      this.userEngaged &&
       this.gameState !== null &&
       this.autoCollectResources.current &&
       prompt.context === "chooseAction"
@@ -98,6 +96,7 @@ export class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
           return false;
         });
         if (relevantResourceCollectActions.length > 0) {
+          answer = createDeferred<number>();
           answer.resolve(relevantResourceCollectActions[0]![0]);
         }
       } catch (e) {

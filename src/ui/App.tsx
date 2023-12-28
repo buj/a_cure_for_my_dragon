@@ -36,11 +36,11 @@ function loadInitGameData() {
 class UndoStack {
   public constructor(
     private stack: GameData[] = [],
-    public isInsideUndo: boolean = false
+    public freeze: boolean = false
   ) {}
 
   public tryPush = (gameData: GameData) => {
-    if (!this.isInsideUndo) {
+    if (!this.freeze) {
       this.stack.push(gameData);
     }
   };
@@ -53,18 +53,26 @@ class UndoStack {
   };
 
   public tryClear = () => {
-    if (!this.isInsideUndo) {
+    if (!this.freeze) {
       this.stack = [];
     }
   };
 }
 
 class GameTracker {
+  private isInsideUndo: boolean;
+
   public constructor(
     private undoStack: UndoStack,
     private currGameData: GameData | null,
     private accumulatedUpdate: Partial<GameData>
-  ) {}
+  ) {
+    this.isInsideUndo = false;
+  }
+
+  public unfreezeUndoStack = () => {
+    this.undoStack.freeze = false;
+  };
 
   public onNewGame = () => {
     this.undoStack = new UndoStack();
@@ -139,13 +147,14 @@ class GameTracker {
       }
       this.undoStack.tryPush(newGameData);
 
-      if (this.currGameData !== null || this.undoStack.isInsideUndo) {
+      if (this.currGameData !== null || this.isInsideUndo) {
         localStorage.setItem("gameData", GameData.serialize(newGameData));
       }
 
       this.currGameData = newGameData;
       this.accumulatedUpdate = {};
-      this.undoStack.isInsideUndo = false;
+      this.isInsideUndo = false;
+      this.undoStack.freeze = true;
     }
   };
 
@@ -153,7 +162,8 @@ class GameTracker {
     const prev = this.undoStack.rewindOne();
     if (prev !== undefined) {
       this.currGameData = null;
-      this.undoStack.isInsideUndo = true;
+      this.undoStack.freeze = true;
+      this.isInsideUndo = true;
       return prev;
     }
   };
@@ -178,6 +188,9 @@ export default function App() {
   const onUpdate = React.useCallback(gameTrackerRef.current.onUpdate, [
     gameTrackerRef,
   ]);
+  const onUserAction = React.useCallback(() => {
+    gameTrackerRef.current.unfreezeUndoStack();
+  }, [gameTrackerRef]);
 
   const [seedInput, setSeedInput] = React.useState<string>("rng seed");
   const handleSeedInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,6 +221,8 @@ export default function App() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // TODO
+    console.log("handleKeyDown", e);
     if (e.key === "z" && e.ctrlKey) {
       handleUndo();
     }
@@ -244,6 +259,7 @@ export default function App() {
           init={gameInit}
           onUpdate={onUpdate}
           autoCollectResources={autocollectResourcesRef}
+          onUserAction={onUserAction}
         />
       )}
     </div>
