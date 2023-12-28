@@ -33,7 +33,6 @@ your recipe is finished!
 
 ![](./readme_res/fin.png)
 
-(And then you have to go back to your original position. That is not implemented --
-the original position will be blocked -- but that's the least. You know when you win.)
+And then you have to go back to your original position, where your dragon is resting, to feed him the brewed stuff. And then you win!
 
 [https://buj.github.io/a_cure_for_my_dragon/](https://buj.github.io/a_cure_for_my_dragon/)
