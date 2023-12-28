@@ -27,6 +27,7 @@ export type Show = { prompt: Prompt<ShowContext>; what: any };
 
 export class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
   private gameState: GameState | null;
+  private userEngaged: boolean;
 
   public constructor(
     private setActiveQuestion: (q: Question) => void,
@@ -34,6 +35,18 @@ export class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
     private autoCollectResources: { current: boolean }
   ) {
     this.gameState = null;
+    this.userEngaged = false;
+  }
+
+  makeDeferred(): Deferred<number> {
+    const inner = createDeferred<number>();
+    return {
+      ...inner,
+      resolve: (value: number) => {
+        this.userEngaged = true;
+        inner.resolve(value);
+      },
+    };
   }
 
   public chooseFromRange = (
@@ -41,7 +54,7 @@ export class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
     l: number,
     r: number
   ): Promise<number> => {
-    const answer = createDeferred<number>();
+    const answer = this.makeDeferred();
     this.setActiveQuestion({
       prompt,
       query: {
@@ -58,8 +71,9 @@ export class UIPlayer implements IPlayer<QuestionContext, ShowContext> {
     prompt: Prompt<QuestionContext>,
     ls: T[]
   ) => Promise<T> = async (prompt, ls) => {
-    const answer = createDeferred<number>();
+    const answer = this.makeDeferred();
     if (
+      this.userEngaged &&
       this.gameState !== null &&
       this.autoCollectResources.current &&
       prompt.context === "chooseAction"

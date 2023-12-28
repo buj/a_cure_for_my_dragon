@@ -6,84 +6,178 @@ import { PrngState } from "../entities";
 import { FrozenDialogueEntry, GameData } from "./gameData";
 import { evalThunk } from "../utils";
 
-function historyMatchesGameState(
-  history: Array<FrozenDialogueEntry> | undefined,
-  gameState: GameState | undefined
+function entryMatchesGameState(
+  entry: FrozenDialogueEntry,
+  gameState: GameState
 ): boolean {
-  if (history === undefined || gameState === undefined) {
-    return false;
-  }
-  const lastEntry = history.slice(-1)[0];
-  if (lastEntry === undefined) {
-    return false;
-  }
-  if (
-    lastEntry.type === "show" &&
-    lastEntry.data.prompt.context === "gameState"
-  ) {
-    return lastEntry.data.what === gameState;
+  if (entry.type === "show" && entry.data.prompt.context === "gameState") {
+    return entry.data.what === gameState;
   }
   return false;
 }
 
-export default function App() {
-  const initGameData = evalThunk(() => {
-    const str = localStorage.getItem("gameData");
-    console.log("local storage gameData", str);
-    if (str === null) {
-      return null;
-    }
-    try {
-      return GameData.deserialize(str);
-    } catch (e) {
-      console.log("could not deserialize game data", {
-        error: e,
-        data: str,
-      });
-    }
+function loadInitGameData() {
+  const str = localStorage.getItem("gameData");
+  console.log("local storage gameData", str);
+  if (str === null) {
     return null;
-  });
+  }
+  try {
+    return GameData.deserialize(str);
+  } catch (e) {
+    console.log("could not deserialize game data", {
+      error: e,
+      data: str,
+    });
+  }
+  return null;
+}
 
-  const currGameDataRef = React.useRef<Partial<GameData>>(initGameData ?? {});
-  const [gameInit, setGameInit] = React.useState<GameInit | null>(() =>
-    initGameData !== null ? { type: "loadGame", data: initGameData } : null
-  );
+class UndoStack {
+  public constructor(
+    private stack: GameData[] = [],
+    public isInsideUndo: boolean = false
+  ) {}
 
-  const onUpdate = React.useCallback(
-    (update: {
-      state?: GameState;
-      history?: DialogueHistory;
-      rngState?: PrngState;
-    }) => {
-      const gameDataRef = currGameDataRef.current;
-      if (update.state !== undefined) {
-        gameDataRef.state = update.state;
-      }
-      if (update.rngState !== undefined) {
-        gameDataRef.rngState = update.rngState;
-      }
-      if (update.history !== undefined) {
-        gameDataRef.history = update.history.getHistory().flatMap((d) => {
+  public tryPush = (gameData: GameData) => {
+    if (!this.isInsideUndo) {
+      this.stack.push(gameData);
+    }
+  };
+
+  public rewindOne = (): GameData | undefined => {
+    if (this.stack.length >= 2) {
+      this.stack = this.stack.slice(0, -1);
+      return this.stack.slice(-1)[0]!;
+    }
+  };
+
+  public tryClear = () => {
+    if (!this.isInsideUndo) {
+      this.stack = [];
+    }
+  };
+}
+
+class GameTracker {
+  public constructor(
+    private undoStack: UndoStack,
+    private currGameData: GameData | null,
+    private accumulatedUpdate: Partial<GameData>
+  ) {}
+
+  public onNewGame = () => {
+    this.undoStack = new UndoStack();
+    this.currGameData = null;
+    this.accumulatedUpdate = {};
+  };
+
+  public onUpdate = (update: {
+    state?: GameState;
+    history?: DialogueHistory;
+    rngState?: PrngState;
+  }) => {
+    if (
+      update.state !== undefined &&
+      update.state !== this.currGameData?.state
+    ) {
+      this.accumulatedUpdate.state = update.state;
+    }
+    if (update.rngState !== undefined) {
+      this.accumulatedUpdate.rngState = update.rngState;
+    }
+    if (update.history !== undefined) {
+      this.accumulatedUpdate.history = update.history
+        .getHistory()
+        .flatMap((d) => {
           const e = FrozenDialogueEntry.fromDialogueEntry(d);
           if (e === null) {
             return [];
           }
           return [e];
         });
+    }
+
+    const newGameData: GameData | null = evalThunk(() => {
+      if (this.currGameData === null) {
+        if (
+          this.accumulatedUpdate.history !== undefined &&
+          this.accumulatedUpdate.rngState !== undefined &&
+          this.accumulatedUpdate.state !== undefined
+        ) {
+          return {
+            history: this.accumulatedUpdate.history!,
+            rngState: this.accumulatedUpdate.rngState!,
+            state: this.accumulatedUpdate.state!,
+          };
+        }
       }
-      if (historyMatchesGameState(gameDataRef.history, gameDataRef.state)) {
-        localStorage.setItem(
-          "gameData",
-          GameData.serialize({
-            rngState: gameDataRef.rngState!,
-            state: gameDataRef.state!,
-            history: gameDataRef.history!,
-          })
-        );
+      if (
+        this.accumulatedUpdate.history !== undefined &&
+        this.accumulatedUpdate.state !== undefined &&
+        entryMatchesGameState(
+          this.accumulatedUpdate.history.slice(-1)[0]!,
+          this.accumulatedUpdate.state
+        )
+      ) {
+        return {
+          history: this.accumulatedUpdate.history!,
+          state: this.accumulatedUpdate.state!,
+          rngState:
+            this.accumulatedUpdate.rngState ?? this.currGameData!.rngState,
+        };
       }
-    },
-    [currGameDataRef]
-  );
+      return null;
+    });
+
+    if (newGameData !== null) {
+      if (
+        this.currGameData !== null &&
+        this.accumulatedUpdate.rngState !== undefined
+      ) {
+        this.undoStack.tryClear();
+      }
+      this.undoStack.tryPush(newGameData);
+
+      if (this.currGameData !== null || this.undoStack.isInsideUndo) {
+        localStorage.setItem("gameData", GameData.serialize(newGameData));
+      }
+
+      this.currGameData = newGameData;
+      this.accumulatedUpdate = {};
+      this.undoStack.isInsideUndo = false;
+    }
+  };
+
+  public startUndo = (): GameData | undefined => {
+    const prev = this.undoStack.rewindOne();
+    if (prev !== undefined) {
+      this.currGameData = null;
+      this.undoStack.isInsideUndo = true;
+      return prev;
+    }
+  };
+}
+
+namespace GameTracker {
+  export function create(): GameTracker {
+    return new GameTracker(new UndoStack(), null, {});
+  }
+}
+
+export default function App() {
+  const gameTrackerRef = React.useRef(GameTracker.create());
+  const [gameInit, setGameInit] = React.useState<GameInit | null>(() => {
+    const initGameData = loadInitGameData();
+    if (initGameData !== null) {
+      return { type: "loadGame", data: initGameData };
+    }
+    return null;
+  });
+
+  const onUpdate = React.useCallback(gameTrackerRef.current.onUpdate, [
+    gameTrackerRef,
+  ]);
 
   const [seedInput, setSeedInput] = React.useState<string>("rng seed");
   const handleSeedInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,17 +190,34 @@ export default function App() {
   };
 
   const handleOnStart = () => {
-    currGameDataRef.current = {};
+    gameTrackerRef.current.onNewGame();
     setGameInit({
       type: "newGame",
       seed: seedInput,
     });
   };
 
+  const handleUndo = () => {
+    const gameData = gameTrackerRef.current.startUndo();
+    if (gameData !== undefined) {
+      setGameInit({
+        type: "loadGame",
+        data: gameData,
+      });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "z" && e.ctrlKey) {
+      handleUndo();
+    }
+  };
+
   return (
     <div
       className="app"
       style={{ display: "flex", flexDirection: "column", height: "95vh" }}
+      onKeyDown={handleKeyDown}
     >
       <div className="controlPanel">
         <div>
@@ -118,6 +229,7 @@ export default function App() {
           <button onClick={handleOnStart}>Start game</button>
         </div>
         <div>
+          <button onClick={handleUndo}>Undo turn (ctrl + z)</button>
           <input
             id="autocollectGoods"
             type="checkbox"

@@ -38,11 +38,17 @@ export class DialogueHistory {
     private mapToOrd: Record<string, number>
   ) {}
 
-  // return this if no cutoff (i.e. `d` is not in history)
+  /** Returns `null` if no cutoff (i.e. `d` is not in history),
+   * and returns `this` if cutoff is exactly at the end (nothing is
+   * cut off, but `d` is in history).
+   */
   cutOffBeyond = (d: DialogueEntry): DialogueHistory | null => {
     const ord = this.mapToOrd[DialogueEntry.deriveKey(d)];
     if (ord === undefined) {
       return null;
+    }
+    if (ord === this.history.length - 1) {
+      return this;
     }
     const newHistory = this.history.slice(0, ord + 1);
     const newMapToOrd = Object.fromEntries(
@@ -51,6 +57,7 @@ export class DialogueHistory {
     return new DialogueHistory(newHistory, newMapToOrd);
   };
 
+  /** Returns `this` if `d` is the very last entry of the history. */
   public add = (d: DialogueEntry): DialogueHistory => {
     const afterCutoff = this.cutOffBeyond(d);
     if (afterCutoff !== null) {

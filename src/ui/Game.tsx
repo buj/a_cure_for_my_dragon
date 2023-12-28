@@ -201,7 +201,9 @@ export default function Game(deps: {
           type: "show",
           data: s,
         });
-        onUpdate({ history: newHistory });
+        if (dialogueHistory !== newHistory) {
+          onUpdate({ history: newHistory });
+        }
         return newHistory;
       });
       if (s.prompt.context === "gameState") {

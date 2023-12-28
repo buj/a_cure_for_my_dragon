@@ -2533,18 +2533,18 @@ export async function runGame(
       },
       [...possibleMoves, ...possibleInteractions]
     );
-    const game2 = await takeAction(
-      action,
-      game.advancePromptNumber(),
-      errorHandler
-    );
+    const game2 = await takeAction(action, game, errorHandler);
     switch (game2._tag) {
       case "Left": {
         errorHandler(game2.left);
         break;
       }
       case "Right": {
-        game = game2.right.advancePromptNumber();
+        if (game !== game2.right) {
+          game = game2.right.advancePromptNumber();
+        } else {
+          console.log("same game state");
+        }
         break;
       }
     }
