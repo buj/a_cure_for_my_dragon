@@ -291,11 +291,15 @@ function PendingQuestionChoices(deps: { question: Question }) {
   switch (q.query.type) {
     case "chooseFromList": {
       const optionsButtons = [...q.query.ls.entries()].map(([idx, option]) => {
+        const buttonRef = React.useRef<HTMLButtonElement>(null);
         const clickHandler = () => {
           q.answer.resolve(idx);
+          if (buttonRef.current !== null) {
+            buttonRef.current.blur();
+          }
         };
         return (
-          <button key={idx} onClick={clickHandler}>
+          <button ref={buttonRef} key={idx} onClick={clickHandler}>
             {visualizeUnknown(option)}
           </button>
         );

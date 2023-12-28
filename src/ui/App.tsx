@@ -214,7 +214,7 @@ export default function App() {
     const gameData = gameTrackerRef.current.startUndo();
     if (gameData !== undefined) {
       setGameInit({
-        type: "loadGame",
+        type: "undo",
         data: gameData,
       });
     }
@@ -226,12 +226,24 @@ export default function App() {
     }
   };
 
+  const appRef = React.useRef<HTMLDivElement>(null);
+  const handleBlur = (e: React.FocusEvent) => {
+    if (appRef.current !== null) {
+      console.log("handleBlur", e);
+      if (e.relatedTarget === null) {
+        appRef.current.focus();
+      }
+    }
+  };
+
   return (
     <div
+      ref={appRef}
       className="app"
-      tabIndex={0}
+      tabIndex={-1}
       style={{ display: "flex", flexDirection: "column", height: "95vh" }}
       onKeyDown={handleKeyDown}
+      onBlur={handleBlur}
     >
       <div className="controlPanel">
         <div>

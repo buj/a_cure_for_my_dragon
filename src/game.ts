@@ -2542,8 +2542,6 @@ export async function runGame(
       case "Right": {
         if (game !== game2.right) {
           game = game2.right.advancePromptNumber();
-        } else {
-          console.log("same game state");
         }
         break;
       }

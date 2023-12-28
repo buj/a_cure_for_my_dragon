@@ -17,6 +17,7 @@ import LostPagesWidget from "./LostPagesWidget";
 import { alchemyStr, dialectStr, progressBarStr, unaryStr } from "./utils";
 import { FrozenDialogueEntry, GameData } from "./gameData";
 import { RngContext } from "../protocol";
+import { evalThunk } from "../utils";
 
 function ErrorPrompt(deps: { error: GameActionError }) {
   return <div className="errorPrompt">{JSON.stringify(deps.error)}</div>;
@@ -103,7 +104,7 @@ export type GameInit =
       seed: string;
     }
   | {
-      type: "loadGame";
+      type: "loadGame" | "undo";
       data: GameData;
     };
 
@@ -174,7 +175,14 @@ export default function Game(deps: {
       activeQuestion.answer.reject("new game starting");
     }
     setActiveQuestion(null);
-    setDialogueHistory(initHistory);
+    switch (init.type) {
+      case "newGame":
+      case "loadGame": {
+        setGameState(null);
+        setDialogueHistory(initHistory);
+        break;
+      }
+    }
     setError(null);
   }
 
@@ -225,12 +233,18 @@ export default function Game(deps: {
       (rngState) => onUpdate({ rngState })
     );
     runGame(
-      init.type === "loadGame"
-        ? {
-            state: init.data.state,
-            promptNumber: init.data.history.length,
-          }
-        : null,
+      evalThunk(() => {
+        switch (init.type) {
+          case "loadGame":
+          case "undo":
+            return {
+              state: init.data.state,
+              promptNumber: init.data.history.length,
+            };
+          case "newGame":
+            return null;
+        }
+      }),
       rng,
       player,
       setError
