@@ -6,6 +6,8 @@ An implementation of this print-and-play game:
 more info here:
 [https://boardgamegeek.com/thread/2969899/wip-cure-my-dragon-13th-roll-write-game-design-con/page/1](https://boardgamegeek.com/thread/2969899/wip-cure-my-dragon-13th-roll-write-game-design-con/page/1)
 
+(disclaimer: I am not the author of the game, credits to them, I am not affiliated in any way. I just implemented it)
+
 If you find any bugs, feel free to file an issue.
 
 # Trailer
