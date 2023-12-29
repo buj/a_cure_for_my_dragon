@@ -92,6 +92,7 @@ export namespace FrozenDialogueEntry {
 }
 
 export type GameData = {
+  initialSeed?: string;
   rngState: PrngState;
   state: GameState;
   history: Array<FrozenDialogueEntry>;
@@ -103,6 +104,7 @@ export namespace GameData {
   }
 
   export function deserialize(str: string): {
+    initialSeed?: string;
     rngState: any;
     state: GameState;
     history: any;
@@ -115,6 +117,7 @@ export namespace GameData {
       throw new Error("history missing from game data");
     }
     return {
+      initialSeed: obj["initialSeed"],
       rngState: obj["rngState"],
       state: zGameState.parse(obj["state"]),
       history: obj["history"],

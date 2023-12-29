@@ -5,6 +5,7 @@ import { DialogueHistory } from "./HistoryWidget";
 import { PrngState } from "../entities";
 import { FrozenDialogueEntry, GameData } from "./gameData";
 import { evalThunk } from "../utils";
+import { randomInt } from "fp-ts/lib/Random";
 
 function entryMatchesGameState(
   entry: FrozenDialogueEntry,
@@ -74,10 +75,10 @@ class GameTracker {
     this.undoStack.freeze = false;
   };
 
-  public onNewGame = () => {
+  public onNewGame = (seed: string) => {
     this.undoStack = new UndoStack();
     this.currGameData = null;
-    this.accumulatedUpdate = {};
+    this.accumulatedUpdate = { initialSeed: seed };
   };
 
   public onUpdate = (update: {
@@ -117,6 +118,7 @@ class GameTracker {
           this.accumulatedUpdate.state !== undefined
         ) {
           return {
+            initialSeed: this.accumulatedUpdate.initialSeed,
             history: this.accumulatedUpdate.history!,
             rngState: this.accumulatedUpdate.rngState!,
             state: this.accumulatedUpdate.state!,
@@ -132,6 +134,7 @@ class GameTracker {
         )
       ) {
         return {
+          initialSeed: this.currGameData?.initialSeed,
           history: this.accumulatedUpdate.history!,
           state: this.accumulatedUpdate.state!,
           rngState:
@@ -167,13 +170,12 @@ class GameTracker {
 }
 
 namespace GameTracker {
-  export function create(): GameTracker {
-    return new GameTracker(new UndoStack(), null, {});
+  export function create(seed?: string): GameTracker {
+    return new GameTracker(new UndoStack(), null, { initialSeed: seed });
   }
 }
 
 export default function App() {
-  const gameTrackerRef = React.useRef(GameTracker.create());
   const [gameInit, setGameInit] = React.useState<GameInit | null>(() => {
     const initGameData = loadInitGameData();
     if (initGameData !== null) {
@@ -181,6 +183,18 @@ export default function App() {
     }
     return null;
   });
+  const gameInitSeed = evalThunk(() => {
+    switch (gameInit?.type) {
+      case "loadGame":
+      case "undo":
+        return gameInit.data.initialSeed;
+      case "newGame":
+        return gameInit.seed;
+      case null:
+        return undefined;
+    }
+  });
+  const gameTrackerRef = React.useRef(GameTracker.create(gameInitSeed));
 
   const onUpdate = React.useCallback(gameTrackerRef.current.onUpdate, [
     gameTrackerRef,
@@ -189,7 +203,9 @@ export default function App() {
     gameTrackerRef.current.unfreezeUndoStack();
   }, [gameTrackerRef]);
 
-  const [seedInput, setSeedInput] = React.useState<string>("rng seed");
+  const seedInputRef = React.useRef<HTMLInputElement>(null);
+  const defaultSeedInput = gameInitSeed ?? "rng seed";
+  const [seedInput, setSeedInput] = React.useState<string>(defaultSeedInput);
   const handleSeedInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSeedInput(e.target.value);
   };
@@ -200,10 +216,22 @@ export default function App() {
   };
 
   const handleOnStart = () => {
-    gameTrackerRef.current.onNewGame();
+    gameTrackerRef.current.onNewGame(seedInput);
     setGameInit({
       type: "newGame",
       seed: seedInput,
+    });
+  };
+
+  const handleOnStartRandomSeed = () => {
+    const randomSeed = `${randomInt(0, 1023456789)()}`;
+    gameTrackerRef.current.onNewGame(randomSeed);
+    if (seedInputRef.current) {
+      seedInputRef.current.value = randomSeed;
+    }
+    setGameInit({
+      type: "newGame",
+      seed: randomSeed,
     });
   };
 
@@ -226,7 +254,6 @@ export default function App() {
   const appRef = React.useRef<HTMLDivElement>(null);
   const handleBlur = (e: React.FocusEvent) => {
     if (appRef.current !== null) {
-      console.log("handleBlur", e);
       if (e.relatedTarget === null) {
         appRef.current.focus();
       }
@@ -246,10 +273,16 @@ export default function App() {
         <div>
           <input
             id="seedInput"
+            ref={seedInputRef}
             onChange={handleSeedInputChange}
-            defaultValue={"rng seed"}
+            defaultValue={defaultSeedInput}
           />
-          <button onClick={handleOnStart}>Start game</button>
+          <button onClick={handleOnStart}>
+            Start game with specified random seed
+          </button>
+          <button onClick={handleOnStartRandomSeed}>
+            Start game with random random seed
+          </button>
         </div>
         <div>
           <button onClick={handleUndo}>Undo turn (ctrl + z)</button>
