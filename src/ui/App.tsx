@@ -93,6 +93,9 @@ class GameTracker {
     }
     if (update.rngState !== undefined) {
       this.accumulatedUpdate.rngState = update.rngState;
+      if (!this.isInsideUndo) {
+        this.undoStack.tryClear();
+      }
     }
     if (update.history !== undefined) {
       this.accumulatedUpdate.history = update.history
@@ -139,12 +142,6 @@ class GameTracker {
     });
 
     if (newGameData !== null) {
-      if (
-        this.currGameData !== null &&
-        this.accumulatedUpdate.rngState !== undefined
-      ) {
-        this.undoStack.tryClear();
-      }
       this.undoStack.tryPush(newGameData);
 
       if (this.currGameData !== null || this.isInsideUndo) {
