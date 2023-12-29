@@ -25,25 +25,26 @@ function ErrorPrompt(deps: { error: GameActionError }) {
 
 function InventoryWidget(deps: { character: Character }) {
   const { character } = deps;
-  const elems: React.JSX.Element[] = [];
+  const elems1: React.JSX.Element[] = [];
   if (character.inventory.rubies > 0) {
-    elems.push(<div>💎: {unaryStr(character.inventory.rubies)}</div>);
+    elems1.push(<div>💎: {unaryStr(character.inventory.rubies)}</div>);
   }
   for (const a in AlchemicalResource) {
     const count = character.inventory.alchemy[a as AlchemicalResource];
     if (count > 0) {
-      elems.push(
+      elems1.push(
         <div>
           {alchemyStr(a)}: {unaryStr(count)}
         </div>
       );
     }
   }
+  const elems2: React.JSX.Element[] = [];
   for (const d in Dialect) {
     const rawCount = character.inventory.rawPages[d as Dialect];
     const translatedCount = character.inventory.translatedPages[d as Dialect];
     if (rawCount + translatedCount > 0) {
-      elems.push(
+      elems2.push(
         <div>
           {dialectStr(d)}:{" "}
           {progressBarStr(translatedCount, translatedCount + rawCount)}
@@ -55,7 +56,14 @@ function InventoryWidget(deps: { character: Character }) {
     <div className="inventory window">
       <h4>Inventory</h4>
       <div>capacity: {unaryStr(character.storageCapacity())}</div>
-      {elems}
+      {elems1}
+      {elems2.length > 0 && (
+        <>
+          <hr style={{ borderTop: "dotted" }} />
+          (not subject to capacity constraints)
+          {elems2}
+        </>
+      )}
     </div>
   );
 }
