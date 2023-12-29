@@ -2529,7 +2529,7 @@ export async function runGame(
     const action = await game.player.chooseFromList(
       {
         context: "chooseAction",
-        key: JSON.stringify(game.promptNumber),
+        key: JSON.stringify([game.promptNumber, "chooseAction"]),
       },
       [...possibleMoves, ...possibleInteractions]
     );
