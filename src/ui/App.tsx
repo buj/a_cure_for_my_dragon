@@ -161,6 +161,7 @@ class GameTracker {
   public startUndo = (): GameData | undefined => {
     const prev = this.undoStack.rewindOne();
     if (prev !== undefined) {
+      this.accumulatedUpdate = { initialSeed: this.currGameData?.initialSeed };
       this.currGameData = null;
       this.undoStack.freeze = true;
       this.isInsideUndo = true;
