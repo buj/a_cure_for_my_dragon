@@ -84,7 +84,7 @@ function SkillsWidget(deps: { learnedSkills: Skill[] }) {
         {"\u00A0"}
         <img
           src={skillSageImgSrc(s)}
-          style={{ height: "1em" }}
+          style={{ height: "1.5em" }}
           alt={skillSageImgSrc(s)}
         />
       </div>
