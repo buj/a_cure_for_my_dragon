@@ -214,10 +214,11 @@ namespace BoardImpl {
     });
   }
 
-  export function onMouseDown(
+  export function onMouseUp(
     q: Question,
     event: React.MouseEvent<SVGSVGElement>,
-    svgRef: React.RefObject<SVGSVGElement>
+    svgRef: React.RefObject<SVGSVGElement>,
+    durationOfPressMs: number
   ) {
     if (!isPositionalQuestion(q.prompt.context)) {
       return;
@@ -232,8 +233,13 @@ namespace BoardImpl {
         switch (event.button) {
           case 1:
             return GameActionType.Interact;
-          case 0:
-            return GameActionType.Move;
+          case 0: {
+            if (durationOfPressMs < 200) {
+              return GameActionType.Move;
+            } else {
+              return GameActionType.Interact;
+            }
+          }
           default:
             return null;
         }
@@ -300,15 +306,23 @@ export default function Board(deps: {
   gameState: GameState | null;
 }) {
   const { question, gameState } = deps;
+  const lastDownStartRef = React.useRef<number>(0);
   const svgRef = React.useRef<SVGSVGElement>(null);
   const cursorRef = React.useRef<SVGCircleElement>(null);
-  const onMouseDown = evalThunk(() => {
+  const [onMouseDown, onMouseUp] = evalThunk(() => {
     if (question === null) {
-      return undefined;
+      return [undefined, undefined];
     }
-    return (e: React.MouseEvent<SVGSVGElement>) => {
-      BoardImpl.onMouseDown(question, e, svgRef);
-    };
+    return [
+      () => {
+        lastDownStartRef.current = Date.now();
+      },
+      (e: React.MouseEvent<SVGSVGElement>) => {
+        const dateMouseUp = Date.now();
+        const durationOfPressMs = dateMouseUp - lastDownStartRef.current;
+        BoardImpl.onMouseUp(question, e, svgRef, durationOfPressMs);
+      },
+    ];
   });
   const onMouseMove = evalThunk(() => {
     if (question === null) {
@@ -327,6 +341,7 @@ export default function Board(deps: {
       width="100%"
       viewBox="0 0 1052 744"
       onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}
       onMouseMove={onMouseMove}
     >
       <image href="board.svg" width="100%" height="100%" />
