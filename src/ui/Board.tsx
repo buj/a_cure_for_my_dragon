@@ -216,7 +216,7 @@ namespace BoardImpl {
 
   export function onMouseUp(
     q: Question,
-    event: React.MouseEvent<SVGSVGElement>,
+    event: React.PointerEvent<SVGSVGElement>,
     svgRef: React.RefObject<SVGSVGElement>,
     durationOfPressMs: number
   ) {
@@ -317,7 +317,7 @@ export default function Board(deps: {
       () => {
         lastDownStartRef.current = Date.now();
       },
-      (e: React.MouseEvent<SVGSVGElement>) => {
+      (e: React.PointerEvent<SVGSVGElement>) => {
         const dateMouseUp = Date.now();
         const durationOfPressMs = dateMouseUp - lastDownStartRef.current;
         BoardImpl.onMouseUp(question, e, svgRef, durationOfPressMs);
@@ -340,9 +340,10 @@ export default function Board(deps: {
       ref={svgRef}
       width="100%"
       viewBox="0 0 1052 744"
-      onMouseDown={onMouseDown}
-      onMouseUp={onMouseUp}
-      onMouseMove={onMouseMove}
+      onPointerDown={onMouseDown}
+      onPointerUp={onMouseUp}
+      onPointerCancel={onMouseUp}
+      onPointerMove={onMouseMove}
     >
       <image href="board.svg" width="100%" height="100%" />
       <circle
